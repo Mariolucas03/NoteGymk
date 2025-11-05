@@ -1,0 +1,81 @@
+/* Reset básico */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+}
+
+/* Cabecera */
+header {
+  background-color: #222;
+  padding: 15px;
+  text-align: center;
+}
+
+header .logo {
+  color: #fff;
+  text-decoration: none;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+/* Contenido principal */
+main {
+  text-align: center;
+  margin: 40px 20px;
+}
+
+main h1 {
+  margin-bottom: 30px;
+  font-size: 1.8rem;
+}
+
+/* Botones de rutinas */
+.rutinas {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.btn-rutina {
+  padding: 15px;
+  font-size: 1.2rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background-color: #4f8cff;
+  color: white;
+  transition: 0.3s;
+}
+
+.btn-rutina:hover {
+  background-color: #3a6fd6;
+  transform: scale(1.05);
+}
+
+/* Botones inferiores */
+footer {
+  display: flex;
+  justify-content: space-around;
+  padding: 20px;
+  background-color: #f4f4f4;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
+
+footer button {
+  padding: 15px 25px;
+  font-size: 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+footer button:hover {
+  background-color: #ddd;
+}

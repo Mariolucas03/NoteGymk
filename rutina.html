@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Rutina</title>
+  <link rel="stylesheet" href="stylesRutina.css">
+</head>
+<body>
+  <header>
+    <a href="index.html" class="logo">Mi Rutina</a>
+    <h1>Rutina de Hoy</h1>
+  </header>
+
+  <main>
+    <div id="contador">00:00</div>
+    <button id="start">Iniciar</button>
+    <button id="stop">Detener</button>
+
+    <form id="rutinaForm">
+      <div id="contenidoRutina"></div>
+      <button type="submit" class="guardar">Guardar Rutina</button>
+    </form>
+  </main>
+
+  <footer>
+    <button onclick="location.href='comida.html'">Comida</button>
+    <button onclick="location.href='ejercicios.html'">Ejercicios</button>
+    <button onclick="location.href='datos.html'">Datos</button>
+  </footer>
+
+  <script src="rutina.js"></script>
+</body>
+</html>

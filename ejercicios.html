@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ejercicios por músculo</title>
+  <link rel="stylesheet" href="stylesEjercicios.css"/>
+</head>
+<body>
+  <header class="header">
+    <a href="index.html" class="logo">Mi Rutina</a>
+    <h1>Ejercicios organizados por músculo principal</h1>
+  </header>
+
+  <main class="container">
+    <!-- Filtros rápidos por grupo muscular -->
+    <nav class="filters" aria-label="Filtrar por músculo">
+      <button class="filter-btn" data-filter="todos">Todos</button>
+      <button class="filter-btn" data-filter="pecho">Pecho</button>
+      <button class="filter-btn" data-filter="espalda">Espalda</button>
+      <button class="filter-btn" data-filter="hombro">Hombro</button>
+      <button class="filter-btn" data-filter="biceps">Bíceps</button>
+      <button class="filter-btn" data-filter="triceps">Tríceps</button>
+      <button class="filter-btn" data-filter="cuadriceps">Cuádriceps</button>
+      <button class="filter-btn" data-filter="isquios">Isquios</button>
+      <button class="filter-btn" data-filter="gluteos">Glúteos</button>
+      <button class="filter-btn" data-filter="gemelos">Gemelos</button>
+      <button class="filter-btn" data-filter="core">Core</button>
+    </nav>
+
+    <!-- Grid de tarjetas de ejercicios -->
+    <section class="grid">
+      <!-- PECHO -->
+      <article class="card" data-musculo="pecho">
+        <h3 class="card-title">Press banca</h3>
+        <p class="card-subtitle">Músculo principal: Pecho</p>
+        <div class="figure">
+          <!-- SVG cuerpo humano: vista frontal -->
+          <svg viewBox="0 0 200 400" class="human">
+            <!-- Silueta base -->
+            <path class="silhouette" d="M100,10 c30,0 40,30 40,50 v40 c0,25 -20,45 -40,45 s-40,-20 -40,-45 v-40 c0,-20 10,-50 40,-50 z"/>
+            <!-- Pecho (pectorales) -->
+            <path class="muscle pectoral" d="M60,90 c20,-15 60,-15 80,0 v25 c-20,15 -60,15 -80,0 z"/>
+            <!-- Brazos y piernas simplificados -->
+            <rect class="limb" x="35" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb" x="145" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb" x="75" y="180" width="20" height="90" rx="10"/>
+            <rect class="limb" x="105" y="180" width="20" height="90" rx="10"/>
+          </svg>
+        </div>
+        <ul class="details">
+          <li><strong>Secundarios:</strong> Tríceps, deltoides anterior</li>
+          <li><strong>Tipo:</strong> Empuje horizontal</li>
+        </ul>
+      </article>
+
+      <article class="card" data-musculo="pecho">
+        <h3 class="card-title">Aperturas con mancuernas</h3>
+        <p class="card-subtitle">Músculo principal: Pecho</p>
+        <div class="figure">
+          <svg viewBox="0 0 200 400" class="human">
+            <path class="silhouette" d="M100,10 c30,0 40,30 40,50 v40 c0,25 -20,45 -40,45 s-40,-20 -40,-45 v-40 c0,-20 10,-50 40,-50 z"/>
+            <path class="muscle pectoral" d="M60,90 c20,-15 60,-15 80,0 v25 c-20,15 -60,15 -80,0 z"/>
+            <rect class="limb" x="35" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb" x="145" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb" x="75" y="180" width="20" height="90" rx="10"/>
+            <rect class="limb" x="105" y="180" width="20" height="90" rx="10"/>
+          </svg>
+        </div>
+        <ul class="details">
+          <li><strong>Secundarios:</strong> Deltoides, bíceps (estabilización)</li>
+          <li><strong>Tipo:</strong> Aislamiento</li>
+        </ul>
+      </article>
+
+      <!-- ESPALDA -->
+      <article class="card" data-musculo="espalda">
+        <h3 class="card-title">Dominadas</h3>
+        <p class="card-subtitle">Músculo principal: Espalda (dorsal ancho)</p>
+        <div class="figure">
+          <svg viewBox="0 0 200 400" class="human">
+            <path class="silhouette" d="M100,10 c30,0 40,30 40,50 v40 c0,25 -20,45 -40,45 s-40,-20 -40,-45 v-40 c0,-20 10,-50 40,-50 z"/>
+            <!-- Dorsal ancho aproximado -->
+            <path class="muscle dorsal" d="M50,110 c10,25 20,35 50,35 s40,-10 50,-35 c-15,-20 -30,-30 -50,-30 s-35,10 -50,30 z"/>
+            <rect class="limb" x="35" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb" x="145" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb" x="75" y="180" width="20" height="90" rx="10"/>
+            <rect class="limb" x="105" y="180" width="20" height="90" rx="10"/>
+          </svg>
+        </div>
+        <ul class="details">
+          <li><strong>Secundarios:</strong> Bíceps, trapecio, romboides</li>
+          <li><strong>Tipo:</strong> Tracción vertical</li>
+        </ul>
+      </article>
+
+      <!-- HOMBRO -->
+      <article class="card" data-musculo="hombro">
+        <h3 class="card-title">Press militar</h3>
+        <p class="card-subtitle">Músculo principal: Deltoides</p>
+        <div class="figure">
+          <svg viewBox="0 0 200 400" class="human">
+            <path class="silhouette" d="M100,10 c30,0 40,30 40,50 v40 c0,25 -20,45 -40,45 s-40,-20 -40,-45 v-40 c0,-20 10,-50 40,-50 z"/>
+            <circle class="muscle deltoid" cx="60" cy="95" r="16"/>
+            <circle class="muscle deltoid" cx="140" cy="95" r="16"/>
+            <rect class="limb" x="35" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb" x="145" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb" x="75" y="180" width="20" height="90" rx="10"/>
+            <rect class="limb" x="105" y="180" width="20" height="90" rx="10"/>
+          </svg>
+        </div>
+        <ul class="details">
+          <li><strong>Secundarios:</strong> Tríceps, trapecio superior</li>
+          <li><strong>Tipo:</strong> Empuje vertical</li>
+        </ul>
+      </article>
+
+      <!-- BRAZO: BÍCEPS -->
+      <article class="card" data-musculo="biceps">
+        <h3 class="card-title">Curl con barra</h3>
+        <p class="card-subtitle">Músculo principal: Bíceps braquial</p>
+        <div class="figure">
+          <svg viewBox="0 0 200 400" class="human">
+            <path class="silhouette" d="M100,10 c30,0 40,30 40,50 v40 c0,25 -20,45 -40,45 s-40,-20 -40,-45 v-40 c0,-20 10,-50 40,-50 z"/>
+            <rect class="limb bicep" x="35" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb bicep" x="145" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb" x="75" y="180" width="20" height="90" rx="10"/>
+            <rect class="limb" x="105" y="180" width="20" height="90" rx="10"/>
+          </svg>
+        </div>
+        <ul class="details">
+          <li><strong>Secundarios:</strong> Braquial, braquiorradial</li>
+          <li><strong>Tipo:</strong> Aislamiento</li>
+        </ul>
+      </article>
+
+      <!-- PIERNA: CUÁDRICEPS -->
+      <article class="card" data-musculo="cuadriceps">
+        <h3 class="card-title">Sentadilla trasera</h3>
+        <p class="card-subtitle">Músculo principal: Cuádriceps</p>
+        <div class="figure">
+          <svg viewBox="0 0 200 400" class="human">
+            <path class="silhouette" d="M100,10 c30,0 40,30 40,50 v40 c0,25 -20,45 -40,45 s-40,-20 -40,-45 v-40 c0,-20 10,-50 40,-50 z"/>
+            <rect class="limb" x="35" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb" x="145" y="115" width="20" height="70" rx="10"/>
+            <rect class="muscle quad" x="75" y="180" width="20" height="90" rx="10"/>
+            <rect class="muscle quad" x="105" y="180" width="20" height="90" rx="10"/>
+          </svg>
+        </div>
+        <ul class="details">
+          <li><strong>Secundarios:</strong> Glúteos, isquios, core</li>
+          <li><strong>Tipo:</strong> Multiaricular</li>
+        </ul>
+      </article>
+
+      <!-- PIERNA: GLÚTEOS -->
+      <article class="card" data-musculo="gluteos">
+        <h3 class="card-title">Hip thrust</h3>
+        <p class="card-subtitle">Músculo principal: Glúteo mayor</p>
+        <div class="figure">
+          <svg viewBox="0 0 200 400" class="human">
+            <path class="silhouette" d="M100,10 c30,0 40,30 40,50 v40 c0,25 -20,45 -40,45 s-40,-20 -40,-45 v-40 c0,-20 10,-50 40,-50 z"/>
+            <path class="muscle glute" d="M70,185 c10,20 20,30 30,30 s20,-10 30,-30 c-10,-10 -20,-15 -30,-15 s-20,5 -30,15 z"/>
+            <rect class="limb" x="75" y="210" width="20" height="80" rx="10"/>
+            <rect class="limb" x="105" y="210" width="20" height="80" rx="10"/>
+          </svg>
+        </div>
+        <ul class="details">
+          <li><strong>Secundarios:</strong> Isquios, core</li>
+          <li><strong>Tipo:</strong> Aislamiento/empuxe de cadera</li>
+        </ul>
+      </article>
+
+      <!-- CORE -->
+      <article class="card" data-musculo="core">
+        <h3 class="card-title">Plancha</h3>
+        <p class="card-subtitle">Músculo principal: Core</p>
+        <div class="figure">
+          <svg viewBox="0 0 200 400" class="human">
+            <path class="silhouette" d="M100,10 c30,0 40,30 40,50 v40 c0,25 -20,45 -40,45 s-40,-20 -40,-45 v-40 c0,-20 10,-50 40,-50 z"/>
+            <rect class="muscle abs" x="85" y="120" width="30" height="45" rx="6"/>
+            <rect class="muscle abs" x="80" y="165" width="40" height="20" rx="6"/>
+            <rect class="limb" x="35" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb" x="145" y="115" width="20" height="70" rx="10"/>
+            <rect class="limb" x="75" y="190" width="20" height="80" rx="10"/>
+            <rect class="limb" x="105" y="190" width="20" height="80" rx="10"/>
+          </svg>
+        </div>
+        <ul class="details">
+          <li><strong>Secundarios:</strong> Hombro (estabilización), glúteos</li>
+          <li><strong>Tipo:</strong> Estático/estabilidad</li>
+        </ul>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <button onclick="location.href='comida.html'">Comida</button>
+    <button onclick="location.href='ejercicios.html'">Ejercicios</button>
+    <button onclick="location.href='datos.html'">Datos</button>
+  </footer>
+
+  <script>
+    // Filtro por grupo muscular
+    const buttons = document.querySelectorAll('.filter-btn');
+    const cards = document.querySelectorAll('.card');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const f = btn.dataset.filter;
+        cards.forEach(card => {
+          card.style.display = (f === 'todos' || card.dataset.musculo === f) ? '' : 'none';
+        });
+      });
+    });
+  </script>
+</body>
+</html>

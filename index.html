@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Rutina</title>
+  <link rel="stylesheet" href="stylesindex.css">
+</head>
+<body>
+  <!-- Cabecera -->
+  <header>
+    <a href="index.html" class="logo">Mi Rutina</a>
+  </header>
+
+  <!-- Selección de rutina -->
+  <main>
+    <h1>Selecciona tu rutina de hoy</h1>
+    <div class="rutinas">
+      <button class="btn-rutina" data-tipo="pecho1">💪 Pecho, Hombro, Tríceps</button>
+      <button class="btn-rutina" data-tipo="biceps1">💪 Bíceps, Espalda</button>
+      <button class="btn-rutina" data-tipo="pierna1">🦵 Pierna, Abdomen</button>
+      <button class="btn-rutina" data-tipo="cardio">🏃 Cardio</button>
+      <button class="btn-rutina" data-tipo="padel">🎾 Padel</button>
+    </div>
+  </main>
+
+  <!-- Botones inferiores -->
+  <footer>
+    <button onclick="location.href='comida.html'">🍽️ Comida</button>
+    <button onclick="location.href='ejercicios.html'">🏋️ Ejercicios</button>
+    <button onclick="location.href='datos.html'">📊 Datos</button>
+  </footer>
+
+  <script>
+    // Redirigir a rutina.html con el tipo seleccionado
+    document.querySelectorAll(".btn-rutina").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const tipo = btn.dataset.tipo;
+        window.location.href = `rutina.html?tipo=${tipo}`;
+      });
+    });
+  </script>
+</body>
+</html>

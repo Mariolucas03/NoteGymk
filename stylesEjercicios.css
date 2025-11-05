@@ -1,0 +1,153 @@
+:root {
+  --bg: #0f1216;
+  --card: #171b22;
+  --text: #e6e8eb;
+  --muted: #a8afb9;
+  --accent: #4f8cff;
+  --muscle: #ff4f6d;
+  --silhouette: #2a313a;
+  --limb: #3a414b;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: radial-gradient(1200px 600px at 50% -200px, #141922, var(--bg));
+  color: var(--text);
+}
+
+.header {
+  padding: 16px 24px;
+  border-bottom: 1px solid #202631;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.logo {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.header h1 {
+  font-size: 1.2rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 24px auto;
+  padding: 0 16px 100px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.filter-btn {
+  background: #1c212b;
+  color: var(--text);
+  border: 1px solid #262c38;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.05s;
+}
+.filter-btn:hover { border-color: var(--accent); }
+.filter-btn:active { transform: scale(0.98); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid #212733;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+.card-title {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+.card-subtitle {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.figure {
+  background: #161b24;
+  border: 1px solid #232a36;
+  border-radius: 12px;
+  padding: 8px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+}
+
+.human {
+  width: 160px;
+  height: auto;
+  display: block;
+}
+
+.silhouette {
+  fill: var(--silhouette);
+}
+.limb {
+  fill: var(--limb);
+}
+
+/* Zonas musculares por grupo */
+.muscle { fill: var(--muscle); }
+
+.pectoral { fill: var(--muscle); }
+.dorsal   { fill: var(--muscle); }
+.deltoid  { fill: var(--muscle); }
+.bicep    { fill: var(--muscle); }
+.quad     { fill: var(--muscle); }
+.glute    { fill: var(--muscle); }
+.abs      { fill: var(--muscle); }
+
+.details {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.details li {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #12161d;
+  border-top: 1px solid #212733;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 12px;
+}
+.footer button {
+  background: #1c212b;
+  color: var(--text);
+  border: 1px solid #262c38;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.footer button:hover { border-color: var(--accent); }

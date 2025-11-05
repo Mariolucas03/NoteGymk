@@ -1,0 +1,78 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background: #f4f4f4;
+}
+
+header {
+  background: #222;
+  color: white;
+  padding: 15px;
+  text-align: center;
+}
+
+.logo {
+  color: white;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+main {
+  padding: 20px;
+}
+
+#contador {
+  font-size: 2rem;
+  margin-bottom: 15px;
+}
+
+button {
+  margin: 5px;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.guardar {
+  background: #4CAF50;
+  color: white;
+  font-size: 1rem;
+}
+
+.ejercicio-card {
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.ejercicio-card h3 {
+  margin-top: 0;
+}
+
+.ejercicio-card table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+
+.ejercicio-card th, .ejercicio-card td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
+}
+
+.ejercicio-card th {
+  background: #f0f0f0;
+}
+
+.add-serie {
+  background: #4f8cff;
+  color: white;
+}
+.ejercicio-card td {
+  text-align: center;
+}

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comida</title>
+  <link rel="stylesheet" href="stylesComida.css">
+</head>
+<body>
+  <header>
+    <a href="index.html" class="logo">Mi Rutina</a>
+    <h1>Registro de Comidas</h1>
+  </header>
+
+  <main>
+    <form id="uploadForm">
+      <label for="foodPhoto">Sube una foto de tu comida:</label>
+      <input type="file" id="foodPhoto" accept="image/*">
+      <button type="submit">Analizar calorías</button>
+    </form>
+
+    <div id="result">
+      <!-- Aquí se mostrará la foto y las calorías -->
+    </div>
+  </main>
+
+  <footer>
+    <button onclick="location.href='comida.html'">Comida</button>
+    <button onclick="location.href='ejercicios.html'">Ejercicios</button>
+    <button onclick="location.href='datos.html'">Datos</button>
+  </footer>
+
+  <script src="comida.js"></script>
+</body>
+</html>

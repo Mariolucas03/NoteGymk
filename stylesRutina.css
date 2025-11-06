@@ -1,24 +1,46 @@
-body {
-  font-family: Arial, sans-serif;
+/* Reset básico */
+* {
   margin: 0;
-  background: #f4f4f4;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
 }
 
+/* Fondo general */
+body {
+  background-color: #f4f4f4;
+  color: #000;
+}
+
+/* Cabecera igual que en index */
 header {
-  background: #222;
-  color: white;
+  background-color: #111;
   padding: 15px;
   text-align: center;
 }
 
-.logo {
-  color: white;
-  text-decoration: none;
+.logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.logo-img {
+  height: 40px;
+  width: 40px;
+}
+
+.logo-text {
+  color: #fff;
+  font-size: 1.8rem;
   font-weight: bold;
 }
 
+/* Contenido principal */
 main {
   padding: 20px;
+  margin-bottom: 70px; /* espacio para que no tape el footer */
 }
 
 #contador {
@@ -26,6 +48,7 @@ main {
   margin-bottom: 15px;
 }
 
+/* Botones generales */
 button {
   margin: 5px;
   padding: 10px 15px;
@@ -40,6 +63,7 @@ button {
   font-size: 1rem;
 }
 
+/* Tarjetas de ejercicios */
 .ejercicio-card {
   background: white;
   border: 1px solid #ccc;
@@ -73,6 +97,95 @@ button {
   background: #4f8cff;
   color: white;
 }
-.ejercicio-card td {
+
+/* Footer igual que en index */
+footer {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px;
+  background-color: #111;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
+
+footer button {
+  width: 74%;
+  max-width: 150px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background-color: #4f8cff;
+  color: #000; /* texto negro */
+  transition: 0.3s;
+}
+
+footer button:hover {
+  background-color: #3a6fd6;
+}
+
+/* Botón iniciar */
+/* Botón iniciar */
+#start {
+  background-color: #4CAF50; /* verde */
+  color: #000;
+  font-weight: bold;
+}
+
+/* Botón pausar */
+#pause {
+  background-color: #f44336; /* rojo */
+  color: #000;
+  font-weight: bold;
+}
+
+
+#contador {
+  display: inline-block;
+  padding: 10px 20px;
+  border-radius: 6px;
+  background-color: #e0e0e0; /* fondo gris claro */
+  color: #000;               /* texto negro */
+  font-size: 1.5rem;
+  font-weight: bold;
   text-align: center;
+  border: 2px solid #ccc;
+  margin-bottom: 15px;
+}
+/* Contenedor fijo para cronómetro y botones */
+.timer-controls {
+  position: fixed;
+  top: 80px;          /* debajo de la cabecera */
+  right: 20px;        /* pegado al lado derecho */
+  background: #fff;
+  border: 2px solid #ccc;
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 1000;      /* siempre encima */
+  text-align: center;
+}
+
+.timer-controls #contador {
+  display: block;
+  margin-bottom: 10px;
+}
+.logo-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none; /* quita el subrayado */
+}
+
+.logo-text {
+  color: #fff;
+  font-size: 1.8rem;
+  font-weight: bold;
+}
+
+.logo-link:hover .logo-text {
+  color: #4f8cff; /* cambia color al pasar el ratón */
 }

@@ -2,30 +2,41 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Rutina</title>
+  <title>NoteGymk - Rutina</title>
   <link rel="stylesheet" href="stylesRutina.css">
 </head>
 <body>
-  <header>
-    <a href="index.html" class="logo">NoteGymk</a>
-    <h1>Rutina de hoy</h1>
-  </header>
+  <!-- Cabecera igual que en index -->
+<header>
+  <div class="logo-container">
+    <a href="index.html" class="logo-link">
+      <img src="logo.png" alt="Logo NoteGymk" class="logo-img">
+      <span class="logo-text">NoteGymk</span>
+    </a>
+  </div>
+</header>
 
-  <main>
+
+<main>
+  <!-- Contenedor fijo -->
+  <div class="timer-controls">
     <div id="contador">00:00</div>
     <button id="start">Iniciar</button>
-    <button id="stop">Detener</button>
+    <button id="pause">Pausar</button>
+  </div>
 
-    <form id="rutinaForm">
-      <div id="contenidoRutina"></div>
-      <button type="submit" class="guardar">Guardar Rutina</button>
-    </form>
-  </main>
+  <!-- Rutina -->
+  <form id="rutinaForm">
+    <div id="contenidoRutina"></div>
+    <button type="submit" class="guardar">Guardar Rutina</button>
+  </form>
+</main>
 
+  <!-- Footer igual que en index -->
   <footer>
-    <button onclick="location.href='comida.html'">Comida</button>
-    <button onclick="location.href='ejercicios.html'">Ejercicios</button>
-    <button onclick="location.href='datos.html'">Datos</button>
+    <button onclick="location.href='comida.html'">🍽️ Comida</button>
+    <button onclick="location.href='ejercicios.html'">🏋️ Ejercicios</button>
+    <button onclick="location.href='datos.html'">📊 Datos</button>
   </footer>
 
   <script src="rutina.js"></script>

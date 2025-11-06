@@ -1,14 +1,17 @@
-let startTime, interval;
+let startTime, interval, elapsedPaused = 0;
 const contador = document.getElementById("contador");
 
-// Cronómetro
+// Iniciar cronómetro
 document.getElementById("start").addEventListener("click", () => {
-  startTime = Date.now();
+  startTime = Date.now() - elapsedPaused * 1000; // reanuda si estaba pausado
   interval = setInterval(updateTime, 1000);
 });
 
-document.getElementById("stop").addEventListener("click", () => {
+// Pausar cronómetro
+document.getElementById("pause").addEventListener("click", () => {
   clearInterval(interval);
+  // guarda el tiempo transcurrido hasta la pausa
+  elapsedPaused = Math.floor((Date.now() - startTime) / 1000);
 });
 
 function updateTime() {
@@ -171,8 +174,12 @@ document.getElementById("rutinaForm").addEventListener("submit", (e) => {
     ejercicios[key].push(val);
   });
 
+  // Fecha en formato DD/MM/YYYY
+  const hoy = new Date();
+  const fecha = `${String(hoy.getDate()).padStart(2,"0")}/${String(hoy.getMonth()+1).padStart(2,"0")}/${hoy.getFullYear()}`;
+
   const rutina = {
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: fecha,   // ejemplo: 06/11/2025
     tiempo: contador.textContent,
     ejercicios
   };

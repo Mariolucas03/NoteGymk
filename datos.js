@@ -34,25 +34,17 @@ function renderCalendar(year, month) {
   }
 
   for (let d = 1; d <= daysInMonth; d++) {
-    // Formato ISO: YYYY-MM-DD
     const fechaFormateada = `${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
     const tieneRutina = rutinas.some(r => r.fecha === fechaFormateada);
 
     let claseDia = "";
-    const hoy = new Date();
+    const limiteHoy = new Date(); limiteHoy.setHours(23,59,59,999);
     const fechaDia = new Date(year, month, d);
 
     if (tieneRutina) {
-      claseDia = "con-rutina"; // verde
-    } else {
-      // Solo marcar rojo si el día ya pasó (incluye hoy hasta las 23:59)
-      const limiteHoy = new Date();
-      limiteHoy.setHours(23,59,59,999);
-      if (fechaDia < limiteHoy) {
-        claseDia = "sin-rutina"; // rojo
-      } else {
-        claseDia = ""; // futuro → sin color
-      }
+      claseDia = "con-rutina";
+    } else if (fechaDia < limiteHoy) {
+      claseDia = "sin-rutina";
     }
 
     html += `<td class="${claseDia}" data-fecha="${fechaFormateada}">${d}</td>`;
@@ -62,46 +54,82 @@ function renderCalendar(year, month) {
   html += "</tr></table>";
   calendar.innerHTML = html;
 
-  // Etiqueta del mes
   const nombreMes = [
     "Enero","Febrero","Marzo","Abril","Mayo","Junio",
     "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
   ];
   monthLabel.textContent = `${nombreMes[month]} ${year}`;
 
-  // Evento click en día
+  // Evento click en día → mostrar TODAS las rutinas de ese día
   calendar.querySelectorAll("td[data-fecha]").forEach(td => {
     td.addEventListener("click", () => {
       const fechaClick = td.dataset.fecha;
-      const rutina = rutinas.find(r => r.fecha === fechaClick);
+      const rutinasDia = rutinas.filter(r => r.fecha === fechaClick);
 
-      if (rutina) {
-        let ejerciciosHTML = "";
+      if (rutinasDia.length > 0) {
+        detalle.innerHTML = rutinasDia.map(rutina => {
+          let ejerciciosHTML = "";
 
-        for (const [key, valores] of Object.entries(rutina.ejercicios)) {
-          const valoresLimpios = valores.filter(v => v !== "" && v !== null);
+          // ===== Fuerza (igual que antes) =====
+          const ejercicios = rutina.ejercicios || {};
+          for (const [key, valores] of Object.entries(ejercicios)) {
+            if (key.endsWith("_kg[]")) {
+              const nombreEjercicio = key.replace("_kg[]", "");
+              const kgSeries = (valores || []).filter(v => v !== "" && v !== null);
+              const repsSeries = ejercicios[`${nombreEjercicio}_reps[]`] || [];
 
-          if (valoresLimpios.length > 0 && key.endsWith("_kg[]")) {
-            const nombreEjercicio = key.replace("_kg[]", "");
-            const reps = rutina.ejercicios[`${nombreEjercicio}_reps[]`] || [];
+              if (kgSeries.length > 0) {
+                ejerciciosHTML += `
+                  <div class="ejercicio-card">
+                    <h3>${nombreEjercicio.replace(/_/g," ")}</h3>
+                    <table>
+                      <thead>
+                        <tr><th>Serie</th><th>Kg</th><th>Reps</th></tr>
+                      </thead>
+                      <tbody>
+                        ${kgSeries.map((kg, i) => `
+                          <tr>
+                            <td>${i+1}</td>
+                            <td>${kg}</td>
+                            <td>${repsSeries[i] || ""}</td>
+                          </tr>
+                        `).join("")}
+                      </tbody>
+                    </table>
+                  </div>
+                `;
+              }
+            }
+          }
 
+          // ===== Cardio desde ejercicios (tabla única) =====
+          const cardioKm = ejercicios["cardio_km[]"] || [];
+          const cardioTiempo = ejercicios["cardio_tiempo[]"] || [];
+          const cardioVelocidad = ejercicios["cardio_velocidad[]"] || [];
+          const cardioKcal = ejercicios["cardio_kcal[]"] || [];
+
+          const cardioFilas = Math.max(
+            cardioKm.length,
+            cardioTiempo.length,
+            cardioVelocidad.length,
+            cardioKcal.length
+          );
+
+          if (cardioFilas > 0) {
             ejerciciosHTML += `
               <div class="ejercicio-card">
-                <h3>${nombreEjercicio}</h3>
+                <h3>Cardio</h3>
                 <table>
                   <thead>
-                    <tr>
-                      <th>Serie</th>
-                      <th>Kg</th>
-                      <th>Reps</th>
-                    </tr>
+                    <tr><th>Km</th><th>Tiempo</th><th>Km/s</th><th>Kcal</th></tr>
                   </thead>
                   <tbody>
-                    ${valoresLimpios.map((kg, i) => `
+                    ${Array.from({ length: cardioFilas }).map((_, i) => `
                       <tr>
-                        <td>${i+1}</td>
-                        <td>${kg}</td>
-                        <td>${reps[i] || ""}</td>
+                        <td>${cardioKm[i] || ""}</td>
+                        <td>${cardioTiempo[i] || ""}</td>
+                        <td>${cardioVelocidad[i] || ""}</td>
+                        <td>${cardioKcal[i] || ""}</td>
                       </tr>
                     `).join("")}
                   </tbody>
@@ -109,13 +137,47 @@ function renderCalendar(year, month) {
               </div>
             `;
           }
-        }
 
-        detalle.innerHTML = `
-          <h3>Rutina del ${rutina.fecha}</h3>
-          <p><span class="tiempo-destacado">${rutina.tiempo}</span></p>
-          ${ejerciciosHTML || "<p>No se registraron ejercicios.</p>"}
-        `;
+          // ===== Pádel desde ejercicios (tabla única) =====
+          const padelTiempo = ejercicios["padel_tiempo[]"] || [];
+          const padelDetalles = ejercicios["padel_detalles[]"] || [];
+          const padelKcal = ejercicios["padel_kcal[]"] || [];
+
+          const padelFilas = Math.max(
+            padelTiempo.length,
+            padelDetalles.length,
+            padelKcal.length
+          );
+
+          if (padelFilas > 0) {
+            ejerciciosHTML += `
+              <div class="ejercicio-card">
+                <h3>Pádel</h3>
+                <table>
+                  <thead>
+                    <tr><th>Tiempo</th><th>Detalles</th><th>Kcal</th></tr>
+                  </thead>
+                  <tbody>
+                    ${Array.from({ length: padelFilas }).map((_, i) => `
+                      <tr>
+                        <td>${padelTiempo[i] || ""}</td>
+                        <td>${padelDetalles[i] || ""}</td>
+                        <td>${padelKcal[i] || ""}</td>
+                      </tr>
+                    `).join("")}
+                  </tbody>
+                </table>
+              </div>
+            `;
+          }
+
+          return `
+            <div class="rutina-dia">
+              <h3>Rutina del ${rutina.fecha}</h3>
+              ${ejerciciosHTML || "<p>No se registraron ejercicios.</p>"}
+            </div>
+          `;
+        }).join("<hr>");
       } else {
         detalle.innerHTML = `<p>No hay rutina registrada este día.</p>`;
       }
@@ -172,9 +234,8 @@ document.getElementById("importRutinas").addEventListener("change", (event) => {
     try {
       const rutinasImportadas = JSON.parse(e.target.result);
       if (Array.isArray(rutinasImportadas)) {
-        // Migrar fechas al formato ISO si vienen en DD/MM/YYYY
         rutinasImportadas.forEach(r => {
-          if (r.fecha.includes("/")) {
+          if (typeof r.fecha === "string" && r.fecha.includes("/")) {
             const [dia, mes, año] = r.fecha.split("/");
             r.fecha = `${año}-${mes.padStart(2,"0")}-${dia.padStart(2,"0")}`;
           }

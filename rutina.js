@@ -112,10 +112,10 @@ if (rutinas[tipo] && rutinas[tipo] !== "especial") {
       </thead>
       <tbody>
         <tr>
-          <td><input type="number" name="cardio_tiempo"></td>
-          <td><input type="number" name="cardio_km"></td>
-          <td><input type="number" name="cardio_kms"></td>
-          <td><input type="number" name="cardio_kcal"></td>
+          <td><input type="number" name="cardio_tiempo[]"></td>
+          <td><input type="number" name="cardio_km[]"></td>
+          <td><input type="number" name="cardio_velocidad[]"></td>
+          <td><input type="number" name="cardio_kcal[]"></td>
         </tr>
       </tbody>
     </table>
@@ -126,18 +126,20 @@ if (rutinas[tipo] && rutinas[tipo] !== "especial") {
   const card = document.createElement("div");
   card.classList.add("ejercicio-card");
   card.innerHTML = `
-    <h3>Padel</h3>
+    <h3>Pádel</h3>
     <table>
       <thead>
         <tr>
           <th>Tiempo (min)</th>
+          <th>Detalles</th>
           <th>Kcal</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td><input type="number" name="padel_tiempo"></td>
-          <td><input type="number" name="padel_kcal"></td>
+          <td><input type="number" name="padel_tiempo[]"></td>
+          <td><input type="text" name="padel_detalles[]"></td>
+          <td><input type="number" name="padel_kcal[]"></td>
         </tr>
       </tbody>
     </table>
@@ -170,8 +172,10 @@ document.getElementById("rutinaForm").addEventListener("submit", (e) => {
   const formData = new FormData(e.target);
   const ejercicios = {};
   formData.forEach((val, key) => {
-    if (!ejercicios[key]) ejercicios[key] = [];
-    ejercicios[key].push(val);
+    if (val !== "") { // solo guarda si hay valor
+      if (!ejercicios[key]) ejercicios[key] = [];
+      ejercicios[key].push(val);
+    }
   });
 
   // Fecha en formato DD/MM/YYYY

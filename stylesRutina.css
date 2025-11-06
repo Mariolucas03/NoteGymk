@@ -12,7 +12,7 @@ body {
   color: #fff;            /* texto blanco */
 }
 
-/* Cabecera igual que en index */
+/* Cabecera */
 header {
   background-color: #222; /* gris oscuro */
   padding: 15px;
@@ -159,12 +159,11 @@ button {
   color: #fff;
 }
 
-/* Footer tipo Instagram */
+/* Footer estilo Instagram */
 footer {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 8px 0;
   background-color: #000;
   position: fixed;
   bottom: 0;
@@ -180,7 +179,7 @@ footer .nav-btn {
   font-size: 1.8rem;
   cursor: pointer;
   flex: 1;
-  padding: 10px 0;
+  padding: 12px 0;
   transition: color 0.3s;
 }
 
@@ -189,25 +188,25 @@ footer .nav-btn:hover {
   color: #fff;
 }
 
-/* Responsivo móvil */
 /* --- Estilo móvil mejorado --- */
 @media (max-width: 600px) {
   main {
     margin-top: 70px;
-    margin-bottom: 110px; /* más espacio para footer */
+    margin-bottom: 120px; /* más espacio para footer */
     padding: 15px;
-    font-size: 1.1rem;    /* texto más grande */
+    font-size: 1.2rem;    /* texto más grande */
   }
 
-  /* Footer más grande y cómodo */
+  /* Footer estilo Instagram */
   footer {
     justify-content: space-around;
-    padding: 12px 0;
+    padding: 0;
   }
 
   footer .nav-btn {
-    font-size: 2rem;   /* iconos más grandes */
-    padding: 14px;     /* más área táctil */
+    flex: 1;
+    font-size: 2.2rem;   /* iconos grandes */
+    padding: 16px;       /* área táctil amplia */
   }
 
   /* Cabecera más compacta */
@@ -227,29 +226,40 @@ footer .nav-btn:hover {
   /* Cronómetro y controles */
   .timer-controls {
     top: auto;
-    bottom: 110px;     /* se coloca encima del footer */
+    bottom: 120px;     /* encima del footer */
     right: 10px;
     left: 10px;
     width: auto;
-    padding: 12px;
-    font-size: 1.2rem;
+    padding: 16px;
+    font-size: 1.3rem;
   }
 
   #contador {
-    font-size: 1.6rem;
-    padding: 12px;
+    font-size: 1.8rem;
+    padding: 14px;
   }
 
-  /* Tarjetas de ejercicios */
+  /* Tarjetas de ejercicios a pantalla completa */
   .ejercicio-card {
-    padding: 12px;
-    font-size: 1rem;
+    width: 100%;
+    padding: 20px;
+    font-size: 1.1rem;
+    border-radius: 0;     /* estilo “pantalla completa” */
+    margin-bottom: 30px;
   }
 
   .ejercicio-card table {
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
-    font-size: 0.9rem;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.1rem;
+  }
+
+  .ejercicio-card th, .ejercicio-card td {
+    padding: 12px;
+    font-size: 1.1rem;
+  }
+
+  .ejercicio-card th {
+    font-size: 1.2rem;
   }
 }

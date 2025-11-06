@@ -101,31 +101,32 @@ button {
 /* Footer igual que en index */
 footer {
   display: flex;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px;
-  background-color: #111;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 0;
+  background-color: #000; /* fondo negro */
   position: fixed;
   bottom: 0;
   width: 100%;
+  border-top: 1px solid #222; /* línea sutil arriba */
 }
 
-footer button {
-  width: 74%;
-  max-width: 150px;
-  padding: 8px 12px;
-  font-size: 0.8rem;
+footer .nav-btn {
+  background: none;
   border: none;
-  border-radius: 6px;
+  color: #aaa; /* gris claro por defecto */
+  font-size: 1.8rem; /* tamaño icono */
   cursor: pointer;
-  background-color: #4f8cff;
-  color: #000; /* texto negro */
-  transition: 0.3s;
+  flex: 1;
+  padding: 10px 0;
+  transition: color 0.3s;
 }
 
-footer button:hover {
-  background-color: #3a6fd6;
+footer .nav-btn.active,
+footer .nav-btn:hover {
+  color: #fff; /* blanco cuando está activo o hover */
 }
+
 
 /* Botón iniciar */
 /* Botón iniciar */
@@ -188,4 +189,33 @@ footer button:hover {
 
 .logo-link:hover .logo-text {
   color: #4f8cff; /* cambia color al pasar el ratón */
+}
+
+/* Responsivo móvil */
+@media (max-width: 600px) {
+  footer {
+    flex-direction: column;
+    gap: 5px;
+    position: static;
+  }
+  footer button {
+    width: 100%;
+    max-width: none;
+    font-size: 1rem;
+  }
+  #calendar-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+  #calendar table {
+    font-size: 0.8rem;
+  }
+  #calendar th, #calendar td {
+    padding: 6px;
+  }
+  .ejercicio-card table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
 }

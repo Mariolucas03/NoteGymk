@@ -11,7 +11,7 @@ body {
   color: #000;
 }
 
-/* Cabecera igual que en index */
+/* Cabecera */
 header {
   background-color: #111;
   padding: 15px;
@@ -50,102 +50,132 @@ header {
 /* Contenido principal */
 main {
   padding: 20px;
-  margin-bottom: 90px; /* espacio para que no tape el footer */
+  margin-bottom: 90px;
 }
 
-/* Footer igual que en index */
+/* Footer */
 footer {
   display: flex;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px;
-  background-color: #111;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 0;
+  background-color: #000; /* fondo negro */
   position: fixed;
   bottom: 0;
   width: 100%;
+  border-top: 1px solid #222; /* línea sutil arriba */
 }
 
-footer button {
-  width: 74%;
-  max-width: 150px;
-  padding: 8px 12px;
-  font-size: 0.8rem;
+footer .nav-btn {
+  background: none;
   border: none;
-  border-radius: 6px;
+  color: #aaa; /* gris claro por defecto */
+  font-size: 1.8rem; /* tamaño icono */
   cursor: pointer;
-  background-color: #4f8cff;
-  color: #000; /* texto negro */
-  transition: 0.3s;
+  flex: 1;
+  padding: 10px 0;
+  transition: color 0.3s;
 }
 
-footer button:hover {
-  background-color: #3a6fd6;
+footer .nav-btn.active,
+footer .nav-btn:hover {
+  color: #fff; /* blanco cuando está activo o hover */
 }
 
-/* --- Estilos para el calendario --- */
+
+/* --- Calendario estilo iPhone --- */
+#calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 15px 0;
+}
+
+#calendar-header h2 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #111;
+}
+
+#calendar-header button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
 #calendar table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 20px;
-}
-
-#calendar th, #calendar td {
-  border: 1px solid #ccc;
-  text-align: center;
-  padding: 8px;
-  height: 40px;
 }
 
 #calendar th {
-  background-color: #e0e0e0;
+  color: #666;
+  font-weight: normal;
+  padding: 8px;
 }
 
-/* Día con rutina → verde */
-#calendar td.con-rutina {
-  background-color: #4CAF50;
+#calendar td {
+  text-align: center;
+  padding: 12px;
+  position: relative;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+/* Día actual → círculo azul detrás */
+#calendar td.hoy {
   color: #fff;
   font-weight: bold;
 }
-
-/* Día pasado sin rutina → rojo */
-#calendar td.sin-rutina {
-  background-color: #f44336;
-  color: #fff;
-  font-weight: bold;
+#calendar td.hoy::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2.4em;
+  height: 2.4em;
+  background-color: #4f8cff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: -1;
 }
 
-/* Quitamos hover */
-#calendar td:hover {
-  background-color: inherit;
+/* Día con rutina → círculo verde detrás */
+#calendar td.con-rutina::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2.4em;
+  height: 2.4em;
+  background-color: #135f16;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: -1;
+  opacity: 5;
 }
 
-/* --- Estilos para el detalle de rutinas --- */
+/* Día pasado sin rutina → círculo rojo detrás */
+#calendar td.sin-rutina::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2.4em;
+  height: 2.4em;
+  background-color: red;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: -1;
+  opacity: 10;
+}
+
+/* Detalle */
 #detalle {
   margin-top: 20px;
 }
 
-#detalle h3 {
-  margin-bottom: 10px;
-}
-
-#detalle table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 15px;
-}
-
-#detalle th, #detalle td {
-  border: 1px solid #ddd;
-  padding: 6px;
-  text-align: center;
-}
-
-#detalle th {
-  background: #f0f0f0;
-  font-weight: bold;
-}
-
-/* Tarjetas de ejercicios */
 .ejercicio-card {
   background: white;
   border: 1px solid #ccc;
@@ -155,39 +185,26 @@ footer button:hover {
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-/* Adaptación a pantallas pequeñas */
-@media (max-width: 600px) {
-  header {
-    padding: 10px;
-  }
-
-  .logo-text {
-    font-size: 1.2rem;
-  }
-
-  footer {
-    flex-direction: column;
-    gap: 5px;
-  }
-
-  footer button {
-    width: 100%;
-    max-width: none;
-    font-size: 1rem;
-  }
-
-  #calendar table, #detalle table {
-    font-size: 0.8rem;
-  }
-
-  #calendar th, #calendar td {
-    padding: 4px;
-    height: auto;
-  }
+.ejercicio-card table {
+  width: 100%;
+  border-collapse: collapse;
 }
+
+.ejercicio-card th, .ejercicio-card td {
+  border: 1px solid #ddd;
+  padding: 6px;
+  text-align: center;
+}
+
+.ejercicio-card th {
+  background: #f0f0f0;
+  font-weight: bold;
+}
+
+/* Tiempo destacado */
 .tiempo-destacado {
   display: inline-block;
-  background-color: #4f8cff; /* azul llamativo */
+  background-color: #4f8cff;
   color: #fff;
   font-weight: bold;
   padding: 10px 20px;
@@ -197,32 +214,8 @@ footer button:hover {
   text-align: center;
   margin: 10px 0;
 }
-#calendar-controls {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 15px;
-}
 
-#calendar-controls button {
-  background-color: #4f8cff;
-  color: #fff;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-#calendar-controls button:hover {
-  background-color: #3a6fd6;
-}
-
-#monthLabel {
-  font-size: 1.2rem;
-  font-weight: bold;
-}
+/* Exportar/Importar */
 #backup-controls {
   display: flex;
   justify-content: center;
@@ -246,4 +239,33 @@ footer button:hover {
 
 #backup-controls input {
   font-size: 0.9rem;
+}
+
+/* Responsivo móvil */
+@media (max-width: 600px) {
+  footer {
+    flex-direction: column;
+    gap: 5px;
+    position: static;
+  }
+  footer button {
+    width: 100%;
+    max-width: none;
+    font-size: 1rem;
+  }
+  #calendar-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+  #calendar table {
+    font-size: 0.8rem;
+  }
+  #calendar th, #calendar td {
+    padding: 6px;
+  }
+  .ejercicio-card table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
 }

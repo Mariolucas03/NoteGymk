@@ -7,10 +7,14 @@
   <link rel="stylesheet" href="stylesComida.css">
 </head>
 <body>
-  <header>
-    <a href="index.html" class="logo">Mi Rutina</a>
-    <h1>Registro de Comidas</h1>
-  </header>
+<header>
+  <div class="logo-container">
+    <a href="index.html" class="logo-link">
+      <img src="logo.png" alt="Logo NoteGymk" class="logo-img">
+      <span class="logo-text">NoteGymk</span>
+    </a>
+  </div>
+</header>
 
   <main>
     <form id="uploadForm">
@@ -24,11 +28,21 @@
     </div>
   </main>
 
-  <footer>
-    <button onclick="location.href='comida.html'">Comida</button>
-    <button onclick="location.href='ejercicios.html'">Ejercicios</button>
-    <button onclick="location.href='datos.html'">Datos</button>
-  </footer>
+<footer>
+  <button class="nav-btn active" onclick="location.href='comida.html'">
+    <i class="fas fa-utensils"></i>
+  </button>
+  <button class="nav-btn" onclick="location.href='ejercicios.html'">
+    <i class="fas fa-dumbbell"></i>
+  </button>
+  <button class="nav-btn" onclick="location.href='datos.html'">
+    <i class="fas fa-chart-bar"></i>
+  </button>
+</footer>
+
+<!-- Añade en el <head> de tu HTML -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
 
   <script src="comida.js"></script>
 </body>

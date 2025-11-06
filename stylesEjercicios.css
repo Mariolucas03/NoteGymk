@@ -130,24 +130,58 @@ body {
   font-size: 0.92rem;
 }
 
-.footer {
+footer {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 0;
+  background-color: #000; /* fondo negro */
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
-  background: #12161d;
-  border-top: 1px solid #212733;
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  padding: 12px;
+  width: 100%;
+  border-top: 1px solid #222; /* línea sutil arriba */
 }
-.footer button {
-  background: #1c212b;
-  color: var(--text);
-  border: 1px solid #262c38;
-  padding: 10px 16px;
-  border-radius: 10px;
+
+footer .nav-btn {
+  background: none;
+  border: none;
+  color: #aaa; /* gris claro por defecto */
+  font-size: 1.8rem; /* tamaño icono */
   cursor: pointer;
+  flex: 1;
+  padding: 10px 0;
+  transition: color 0.3s;
 }
-.footer button:hover { border-color: var(--accent); }
+
+footer .nav-btn.active,
+footer .nav-btn:hover {
+  color: #fff; /* blanco cuando está activo o hover */
+}
+/* Responsivo móvil */
+@media (max-width: 600px) {
+  footer {
+    flex-direction: column;
+    gap: 5px;
+    position: static;
+  }
+  footer button {
+    width: 100%;
+    max-width: none;
+    font-size: 1rem;
+  }
+  #calendar-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+  #calendar table {
+    font-size: 0.8rem;
+  }
+  #calendar th, #calendar td {
+    padding: 6px;
+  }
+  .ejercicio-card table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}

@@ -15,7 +15,7 @@ function renderCalendar(year, month) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   let html = "<table><tr>";
-  const diasSemana = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const diasSemana = ["D", "L", "M", "X", "J", "V", "S"];
   diasSemana.forEach(d => html += `<th>${d}</th>`);
   html += "</tr><tr>";
 
@@ -24,19 +24,26 @@ function renderCalendar(year, month) {
   }
 
   for (let d = 1; d <= daysInMonth; d++) {
-    const fechaFormateada = `${String(d).padStart(2,"0")}/${String(month+1).padStart(2,"0")}/${year}`;
+    // Formato ISO: YYYY-MM-DD
+    const fechaFormateada = `${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
     const tieneRutina = rutinas.some(r => r.fecha === fechaFormateada);
 
     let claseDia = "";
     const hoy = new Date();
+
     if (tieneRutina) {
-      claseDia = "con-rutina"; // verde
+      claseDia = "con-rutina";
     } else if (
       year < hoy.getFullYear() ||
       (year === hoy.getFullYear() && month < hoy.getMonth()) ||
       (year === hoy.getFullYear() && month === hoy.getMonth() && d < hoy.getDate())
     ) {
-      claseDia = "sin-rutina"; // rojo si el día ya pasó y no hay rutina
+      claseDia = "sin-rutina";
+    }
+
+    // Día actual
+    if (year === hoy.getFullYear() && month === hoy.getMonth() && d === hoy.getDate()) {
+      claseDia += " hoy";
     }
 
     html += `<td class="${claseDia}" data-fecha="${fechaFormateada}">${d}</td>`;

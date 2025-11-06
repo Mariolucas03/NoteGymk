@@ -16,31 +16,42 @@
     </div>
   </header>
 
-<main>
-  <h1>Datos guardados</h1>
-  <div id="calendar-controls">
-    <button id="prevMonth">◀ Mes anterior</button>
-    <span id="monthLabel"></span>
-    <button id="nextMonth">Mes siguiente ▶</button>
-  </div>
-  <div id="calendar"></div>
-  <div id="detalle"></div>
+  <main>
+    <h1>Datos guardados</h1>
 
-  <!-- Botones de exportar/importar -->
-  <div id="backup-controls">
-    <button id="exportRutinas">📤 Exportar rutinas</button>
-    <input type="file" id="importRutinas" accept="application/json">
-  </div>
-</main>
+    <!-- Controles de calendario estilo iPhone -->
+    <div id="calendar-header">
+      <button id="prevMonth">◀</button>
+      <h2 id="monthLabel"></h2>
+      <button id="nextMonth">▶</button>
+    </div>
 
+    <div id="calendar"></div>
+    <div id="detalle"></div>
 
+    <!-- Botones de exportar/importar -->
+    <div id="backup-controls">
+      <button id="exportRutinas">📤 Exportar rutinas</button>
+      <input type="file" id="importRutinas" accept="application/json">
+    </div>
+  </main>
 
   <!-- Footer -->
-  <footer>
-    <button onclick="location.href='comida.html'">🍽️ Comida</button>
-    <button onclick="location.href='ejercicios.html'">🏋️ Ejercicios</button>
-    <button onclick="location.href='datos.html'">📊 Datos</button>
-  </footer>
+<footer>
+  <button class="nav-btn active" onclick="location.href='comida.html'">
+    <i class="fas fa-utensils"></i>
+  </button>
+  <button class="nav-btn" onclick="location.href='ejercicios.html'">
+    <i class="fas fa-dumbbell"></i>
+  </button>
+  <button class="nav-btn" onclick="location.href='datos.html'">
+    <i class="fas fa-chart-bar"></i>
+  </button>
+</footer>
+
+<!-- Añade en el <head> de tu HTML -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
 
   <script src="datos.js"></script>
 </body>

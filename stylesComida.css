@@ -1,6 +1,16 @@
+/* Fondo negro general */
+body {
+  background-color: #000;
+  color: #fff;
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+/* Resultado */
 #result {
-  margin-top: 20px;
+  margin-top: 100px; /* deja espacio para cabecera fija */
   text-align: center;
+  padding-bottom: 80px; /* deja espacio para footer fijo */
 }
 
 #result img {
@@ -15,15 +25,15 @@
   color: #ff4f6d;
 }
 
-
-
+/* Cabecera fija */
 header {
-  background-color: #111;
+  background-color: #222; /* gris oscuro */
   padding: 15px;
   text-align: center;
   position: fixed;
   top: 0;
   width: 100%;
+  z-index: 1000;
 }
 
 .logo-container {
@@ -44,23 +54,36 @@ header {
   font-weight: bold;
 }
 
+.logo-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.logo-link:hover .logo-text {
+  color: #4f8cff;
+}
+
+/* Footer tipo Instagram */
 footer {
   display: flex;
   justify-content: space-around;
   align-items: center;
   padding: 8px 0;
-  background-color: #000; /* fondo negro */
+  background-color: #000;
   position: fixed;
   bottom: 0;
   width: 100%;
-  border-top: 1px solid #222; /* línea sutil arriba */
+  border-top: 1px solid #222;
+  z-index: 1000;
 }
 
 footer .nav-btn {
   background: none;
   border: none;
-  color: #aaa; /* gris claro por defecto */
-  font-size: 1.8rem; /* tamaño icono */
+  color: #aaa;
+  font-size: 1.8rem;
   cursor: pointer;
   flex: 1;
   padding: 10px 0;
@@ -69,35 +92,50 @@ footer .nav-btn {
 
 footer .nav-btn.active,
 footer .nav-btn:hover {
-  color: #fff; /* blanco cuando está activo o hover */
+  color: #fff;
 }
-
 
 /* Responsivo móvil */
+/* --- Estilo móvil mejorado para index --- */
 @media (max-width: 600px) {
+  /* Ajuste del resultado */
+  #result {
+    margin-top: 80px;       /* menos espacio para cabecera */
+    padding-bottom: 110px;  /* más espacio para footer */
+  }
+
+  #result img {
+    max-width: 90%;         /* imagen ocupa casi todo el ancho */
+    height: auto;
+  }
+
+  #result .calorias {
+    font-size: 1.4rem;      /* texto más grande y legible */
+  }
+
+  /* Footer más grande y cómodo */
   footer {
-    flex-direction: column;
-    gap: 5px;
-    position: static;
+    justify-content: space-around;
+    padding: 12px 0;
   }
-  footer button {
-    width: 100%;
-    max-width: none;
-    font-size: 1rem;
+
+  footer .nav-btn {
+    font-size: 2rem;        /* iconos más grandes */
+    padding: 14px;          /* más área táctil */
   }
-  #calendar-header {
-    flex-direction: column;
-    gap: 8px;
+
+  /* Cabecera más compacta */
+  header {
+    padding: 12px;
   }
-  #calendar table {
-    font-size: 0.8rem;
+
+  .logo-img {
+    height: 35px;
+    width: 35px;
   }
-  #calendar th, #calendar td {
-    padding: 6px;
-  }
-  .ejercicio-card table {
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
+
+  .logo-text {
+    font-size: 1.5rem;
   }
 }
+

@@ -8,15 +8,19 @@
 
 /* Fondo general */
 body {
-  background-color: #f4f4f4;
-  color: #000;
+  background-color: #000; /* fondo negro */
+  color: #fff;            /* texto blanco */
 }
 
 /* Cabecera igual que en index */
 header {
-  background-color: #111;
+  background-color: #222; /* gris oscuro */
   padding: 15px;
   text-align: center;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
 }
 
 .logo-container {
@@ -37,14 +41,35 @@ header {
   font-weight: bold;
 }
 
+.logo-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.logo-link:hover .logo-text {
+  color: #4f8cff;
+}
+
 /* Contenido principal */
 main {
   padding: 20px;
-  margin-bottom: 70px; /* espacio para que no tape el footer */
+  margin-top: 80px;   /* espacio para cabecera fija */
+  margin-bottom: 80px;/* espacio para footer fijo */
 }
 
+/* Cronómetro */
 #contador {
-  font-size: 2rem;
+  display: inline-block;
+  padding: 10px 20px;
+  border-radius: 6px;
+  background-color: #e0e0e0;
+  color: #000;
+  font-size: 1.5rem;
+  font-weight: bold;
+  text-align: center;
+  border: 2px solid #ccc;
   margin-bottom: 15px;
 }
 
@@ -59,18 +84,52 @@ button {
 
 .guardar {
   background: #4CAF50;
-  color: white;
+  color: #fff;
   font-size: 1rem;
+}
+
+/* Botón iniciar */
+#start {
+  background-color: #4CAF50;
+  color: #000;
+  font-weight: bold;
+}
+
+/* Botón pausar */
+#pause {
+  background-color: #f44336;
+  color: #000;
+  font-weight: bold;
+}
+
+/* Contenedor fijo para cronómetro y botones */
+.timer-controls {
+  position: fixed;
+  top: 80px;          /* debajo de la cabecera */
+  right: 20px;
+  background: #fff;
+  border: 2px solid #ccc;
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 1000;
+  text-align: center;
+}
+
+.timer-controls #contador {
+  display: block;
+  margin-bottom: 10px;
 }
 
 /* Tarjetas de ejercicios */
 .ejercicio-card {
-  background: white;
-  border: 1px solid #ccc;
+  background: #111; /* tarjeta oscura */
+  border: 1px solid #444;
   border-radius: 10px;
   padding: 15px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 6px rgba(255,255,255,0.2);
+  color: #fff;
 }
 
 .ejercicio-card h3 {
@@ -84,38 +143,41 @@ button {
 }
 
 .ejercicio-card th, .ejercicio-card td {
-  border: 1px solid #ddd;
+  border: 1px solid #444;
   padding: 8px;
   text-align: center;
+  color: #fff;
 }
 
 .ejercicio-card th {
-  background: #f0f0f0;
+  background: #333;
 }
 
+/* Botón añadir serie */
 .add-serie {
   background: #4f8cff;
-  color: white;
+  color: #fff;
 }
 
-/* Footer igual que en index */
+/* Footer tipo Instagram */
 footer {
   display: flex;
   justify-content: space-around;
   align-items: center;
   padding: 8px 0;
-  background-color: #000; /* fondo negro */
+  background-color: #000;
   position: fixed;
   bottom: 0;
   width: 100%;
-  border-top: 1px solid #222; /* línea sutil arriba */
+  border-top: 1px solid #222;
+  z-index: 1000;
 }
 
 footer .nav-btn {
   background: none;
   border: none;
-  color: #aaa; /* gris claro por defecto */
-  font-size: 1.8rem; /* tamaño icono */
+  color: #aaa;
+  font-size: 1.8rem;
   cursor: pointer;
   flex: 1;
   padding: 10px 0;
@@ -124,98 +186,70 @@ footer .nav-btn {
 
 footer .nav-btn.active,
 footer .nav-btn:hover {
-  color: #fff; /* blanco cuando está activo o hover */
-}
-
-
-/* Botón iniciar */
-/* Botón iniciar */
-#start {
-  background-color: #4CAF50; /* verde */
-  color: #000;
-  font-weight: bold;
-}
-
-/* Botón pausar */
-#pause {
-  background-color: #f44336; /* rojo */
-  color: #000;
-  font-weight: bold;
-}
-
-
-#contador {
-  display: inline-block;
-  padding: 10px 20px;
-  border-radius: 6px;
-  background-color: #e0e0e0; /* fondo gris claro */
-  color: #000;               /* texto negro */
-  font-size: 1.5rem;
-  font-weight: bold;
-  text-align: center;
-  border: 2px solid #ccc;
-  margin-bottom: 15px;
-}
-/* Contenedor fijo para cronómetro y botones */
-.timer-controls {
-  position: fixed;
-  top: 80px;          /* debajo de la cabecera */
-  right: 20px;        /* pegado al lado derecho */
-  background: #fff;
-  border: 2px solid #ccc;
-  border-radius: 10px;
-  padding: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  z-index: 1000;      /* siempre encima */
-  text-align: center;
-}
-
-.timer-controls #contador {
-  display: block;
-  margin-bottom: 10px;
-}
-.logo-link {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-decoration: none; /* quita el subrayado */
-}
-
-.logo-text {
   color: #fff;
-  font-size: 1.8rem;
-  font-weight: bold;
-}
-
-.logo-link:hover .logo-text {
-  color: #4f8cff; /* cambia color al pasar el ratón */
 }
 
 /* Responsivo móvil */
+/* --- Estilo móvil mejorado --- */
 @media (max-width: 600px) {
-  footer {
-    flex-direction: column;
-    gap: 5px;
-    position: static;
+  main {
+    margin-top: 70px;
+    margin-bottom: 110px; /* más espacio para footer */
+    padding: 15px;
+    font-size: 1.1rem;    /* texto más grande */
   }
-  footer button {
-    width: 100%;
-    max-width: none;
+
+  /* Footer más grande y cómodo */
+  footer {
+    justify-content: space-around;
+    padding: 12px 0;
+  }
+
+  footer .nav-btn {
+    font-size: 2rem;   /* iconos más grandes */
+    padding: 14px;     /* más área táctil */
+  }
+
+  /* Cabecera más compacta */
+  header {
+    padding: 12px;
+  }
+
+  .logo-img {
+    height: 35px;
+    width: 35px;
+  }
+
+  .logo-text {
+    font-size: 1.5rem;
+  }
+
+  /* Cronómetro y controles */
+  .timer-controls {
+    top: auto;
+    bottom: 110px;     /* se coloca encima del footer */
+    right: 10px;
+    left: 10px;
+    width: auto;
+    padding: 12px;
+    font-size: 1.2rem;
+  }
+
+  #contador {
+    font-size: 1.6rem;
+    padding: 12px;
+  }
+
+  /* Tarjetas de ejercicios */
+  .ejercicio-card {
+    padding: 12px;
     font-size: 1rem;
   }
-  #calendar-header {
-    flex-direction: column;
-    gap: 8px;
-  }
-  #calendar table {
-    font-size: 0.8rem;
-  }
-  #calendar th, #calendar td {
-    padding: 6px;
-  }
+
   .ejercicio-card table {
     display: block;
     overflow-x: auto;
     white-space: nowrap;
+    font-size: 0.9rem;
   }
 }

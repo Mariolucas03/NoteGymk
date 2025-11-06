@@ -1,4 +1,14 @@
-const rutinas = JSON.parse(localStorage.getItem("rutinas")) || [];
+// Cargar rutinas desde localStorage y migrar fechas antiguas a formato ISO
+let rutinas = JSON.parse(localStorage.getItem("rutinas")) || [];
+
+rutinas.forEach(r => {
+  if (r.fecha && r.fecha.includes("/")) {
+    const [dia, mes, año] = r.fecha.split("/");
+    r.fecha = `${año}-${mes.padStart(2,"0")}-${dia.padStart(2,"0")}`;
+  }
+});
+localStorage.setItem("rutinas", JSON.stringify(rutinas));
+
 const calendar = document.getElementById("calendar");
 const detalle = document.getElementById("detalle");
 const monthLabel = document.getElementById("monthLabel");
@@ -30,20 +40,19 @@ function renderCalendar(year, month) {
 
     let claseDia = "";
     const hoy = new Date();
+    const fechaDia = new Date(year, month, d);
 
     if (tieneRutina) {
-      claseDia = "con-rutina";
-    } else if (
-      year < hoy.getFullYear() ||
-      (year === hoy.getFullYear() && month < hoy.getMonth()) ||
-      (year === hoy.getFullYear() && month === hoy.getMonth() && d < hoy.getDate())
-    ) {
-      claseDia = "sin-rutina";
-    }
-
-    // Día actual
-    if (year === hoy.getFullYear() && month === hoy.getMonth() && d === hoy.getDate()) {
-      claseDia += " hoy";
+      claseDia = "con-rutina"; // verde
+    } else {
+      // Solo marcar rojo si el día ya pasó (incluye hoy hasta las 23:59)
+      const limiteHoy = new Date();
+      limiteHoy.setHours(23,59,59,999);
+      if (fechaDia < limiteHoy) {
+        claseDia = "sin-rutina"; // rojo
+      } else {
+        claseDia = ""; // futuro → sin color
+      }
     }
 
     html += `<td class="${claseDia}" data-fecha="${fechaFormateada}">${d}</td>`;
@@ -163,9 +172,16 @@ document.getElementById("importRutinas").addEventListener("change", (event) => {
     try {
       const rutinasImportadas = JSON.parse(e.target.result);
       if (Array.isArray(rutinasImportadas)) {
+        // Migrar fechas al formato ISO si vienen en DD/MM/YYYY
+        rutinasImportadas.forEach(r => {
+          if (r.fecha.includes("/")) {
+            const [dia, mes, año] = r.fecha.split("/");
+            r.fecha = `${año}-${mes.padStart(2,"0")}-${dia.padStart(2,"0")}`;
+          }
+        });
         localStorage.setItem("rutinas", JSON.stringify(rutinasImportadas));
         alert("Rutinas importadas correctamente ✅");
-        location.reload(); // recargamos para verlas en el calendario
+        location.reload();
       } else {
         alert("El archivo no tiene el formato correcto ❌");
       }

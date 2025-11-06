@@ -9,21 +9,27 @@
   --limb: #3a414b;
 }
 
+/* Reset */
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+html, body { height: 100%; margin: 0; }
 body {
-  margin: 0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   background: radial-gradient(1200px 600px at 50% -200px, #141922, var(--bg));
   color: var(--text);
 }
 
+/* Cabecera */
 .header {
   padding: 16px 24px;
   border-bottom: 1px solid #202631;
   display: flex;
   align-items: center;
   gap: 16px;
+  background-color: #222; /* gris oscuro */
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
 }
 .logo {
   color: var(--text);
@@ -37,12 +43,14 @@ body {
   margin: 0;
 }
 
+/* Contenedor principal */
 .container {
   max-width: 1100px;
-  margin: 24px auto;
-  padding: 0 16px 100px;
+  margin: 100px auto 100px; /* espacio para cabecera y footer */
+  padding: 0 16px;
 }
 
+/* Filtros */
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -61,6 +69,7 @@ body {
 .filter-btn:hover { border-color: var(--accent); }
 .filter-btn:active { transform: scale(0.98); }
 
+/* Grid de tarjetas */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -84,6 +93,7 @@ body {
   font-size: 0.9rem;
 }
 
+/* Figura humana */
 .figure {
   background: #161b24;
   border: 1px solid #232a36;
@@ -93,31 +103,21 @@ body {
   place-items: center;
   margin-bottom: 12px;
 }
-
 .human {
   width: 160px;
   height: auto;
   display: block;
 }
+.silhouette { fill: var(--silhouette); }
+.limb       { fill: var(--limb); }
+.muscle     { fill: var(--muscle); }
 
-.silhouette {
-  fill: var(--silhouette);
+/* Zonas musculares */
+.pectoral, .dorsal, .deltoid, .bicep, .quad, .glute, .abs {
+  fill: var(--muscle);
 }
-.limb {
-  fill: var(--limb);
-}
 
-/* Zonas musculares por grupo */
-.muscle { fill: var(--muscle); }
-
-.pectoral { fill: var(--muscle); }
-.dorsal   { fill: var(--muscle); }
-.deltoid  { fill: var(--muscle); }
-.bicep    { fill: var(--muscle); }
-.quad     { fill: var(--muscle); }
-.glute    { fill: var(--muscle); }
-.abs      { fill: var(--muscle); }
-
+/* Detalles */
 .details {
   list-style: none;
   padding: 0;
@@ -130,58 +130,90 @@ body {
   font-size: 0.92rem;
 }
 
+/* Footer tipo Instagram */
 footer {
   display: flex;
   justify-content: space-around;
   align-items: center;
   padding: 8px 0;
-  background-color: #000; /* fondo negro */
+  background-color: #000;
   position: fixed;
   bottom: 0;
   width: 100%;
-  border-top: 1px solid #222; /* línea sutil arriba */
+  border-top: 1px solid #222;
+  z-index: 1000;
 }
-
 footer .nav-btn {
   background: none;
   border: none;
-  color: #aaa; /* gris claro por defecto */
-  font-size: 1.8rem; /* tamaño icono */
+  color: #aaa;
+  font-size: 1.8rem;
   cursor: pointer;
   flex: 1;
   padding: 10px 0;
   transition: color 0.3s;
 }
-
 footer .nav-btn.active,
 footer .nav-btn:hover {
-  color: #fff; /* blanco cuando está activo o hover */
+  color: #fff;
 }
+
 /* Responsivo móvil */
+/* --- Estilo móvil mejorado --- */
 @media (max-width: 600px) {
-  footer {
-    flex-direction: column;
-    gap: 5px;
-    position: static;
-  }
-  footer button {
-    width: 100%;
-    max-width: none;
+  /* Contenedor principal más cómodo */
+  .container {
+    margin: 80px auto 120px; /* más espacio para footer */
+    padding: 12px;
     font-size: 1rem;
   }
-  #calendar-header {
-    flex-direction: column;
-    gap: 8px;
+
+  /* Footer más grande y cómodo */
+  footer {
+    justify-content: space-around;
+    padding: 14px 0;
   }
-  #calendar table {
-    font-size: 0.8rem;
+
+  footer .nav-btn {
+    font-size: 2rem;   /* iconos más grandes */
+    padding: 14px;     /* más área táctil */
   }
-  #calendar th, #calendar td {
-    padding: 6px;
+
+  /* Cabecera más compacta */
+  .header {
+    padding: 12px 16px;
   }
-  .ejercicio-card table {
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
+
+  .header h1 {
+    font-size: 1rem;
+  }
+
+  .logo {
+    font-size: 1.2rem;
+  }
+
+  /* Figura humana más grande en móvil */
+  .human {
+    width: 200px;
+  }
+
+  /* Tarjetas más legibles */
+  .card {
+    padding: 12px;
+    font-size: 1rem;
+  }
+
+  .card-title {
+    font-size: 1.1rem;
+  }
+
+  .card-subtitle {
+    font-size: 0.95rem;
+  }
+
+  /* Grid más flexible en móvil */
+  .grid {
+    grid-template-columns: 1fr; /* una tarjeta por fila */
   }
 }
+

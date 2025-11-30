@@ -7,47 +7,23 @@ export default function Perfil() {
     const [selectedDate, setSelectedDate] = useState('');
     const [events, setEvents] = useState([]);
 
-    // --- FUNCIÓN TEMPORAL PARA CREAR USUARIO EN LA NUBE ---
-    const crearUsuario = async () => {
-        try {
-            const res = await fetch(`${API_BASE_URL}/user`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    _id: "user_1",
-                    name: "Ana Garcia",
-                    xp: 0,
-                    level: 1,
-                    coins: 200,
-                    lives: 3
-                })
-            });
-            if (res.ok) {
-                alert("¡ÉXITO! Usuario user_1 creado en la nube. Ahora recarga la página.");
-            } else {
-                alert("Error al crear. Mira la consola.");
-                console.error(await res.text());
-            }
-        } catch (e) {
-            alert("Error de conexión: " + e);
-        }
-    };
-    // ------------------------------------------------------
-
     useEffect(() => {
         async function load() {
+            // Protección: Si no hay usuario cargado aún, no hacemos nada
             if (!user?.id) return; 
 
             try {
                 const res = await fetch(`${API_BASE_URL}/user/${user.id}/events`);
                 
+                // Si el servidor da error, mostramos lista vacía en vez de romper la web
                 if (!res.ok) {
-                    console.warn("Error cargando eventos, servidor respondió:", res.status);
+                    console.warn("No se pudieron cargar eventos:", res.status);
                     setEvents([]); 
                     return;
                 }
 
                 const data = await res.json();
+                // Aseguramos que data sea siempre un array
                 setEvents(Array.isArray(data) ? data : []);
             } catch (e) { 
                 console.error("Error de conexión:", e);
@@ -57,53 +33,54 @@ export default function Perfil() {
         load();
     }, [user]); 
 
+    // Filtro seguro: (events || []) evita que la web se ponga en blanco si events es null
     const eventsForDate = selectedDate 
         ? (events || []).filter(ev => ev.date === selectedDate) 
         : [];
 
     return (
         <section>
-            <h3 className="font-bold">Perfil</h3>
+            <h3 className="font-bold mb-4">Perfil</h3>
 
-            {/* --- BOTÓN DE SOCORRO --- */}
-            <button 
-                onClick={crearUsuario} 
-                className="bg-red-600 text-white font-bold p-3 rounded w-full mb-4 shadow-lg hover:bg-red-700 transition-colors"
-            >
-                ⚠️ PULSA ESTO 1 VEZ PARA CREAR EL USUARIO
-            </button>
-            {/* ------------------------ */}
-
-            <div className="border p-3 rounded flex justify-between items-center">
+            <div className="border p-3 rounded flex justify-between items-center shadow-sm">
                 <div>
-                    <div>Nombre: {user?.name}</div>
-                    <div>Nivel: {user?.level}</div>
-                    <div>XP: {user?.xp}</div>
-                    <div>Monedas: {user?.coins}</div>
-                    <div>Vidas: {user?.lives}</div>
+                    {/* Usamos 'user?.' para proteger la carga inicial */}
+                    <div className="font-medium text-lg">{user?.name}</div>
+                    <div className="text-sm text-gray-600">Nivel: {user?.level}</div>
+                    <div className="text-sm text-gray-600">XP: {user?.xp}</div>
+                    <div className="text-sm text-gray-600">Monedas: {user?.coins}</div>
+                    <div className="text-sm text-gray-600">Vidas: {user?.lives}</div>
                 </div>
-                <div className="w-16 h-16 bg-gray-300 rounded-full"></div>
+                <div className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center text-2xl">
+                    👤
+                </div>
             </div>
 
-            <div className="mt-3">
-                <div className="font-semibold">Calendario</div>
-                <input type="date" className="border p-2 rounded mt-2" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
-                <div className="mt-2">
+            <div className="mt-6">
+                <div className="font-semibold text-lg">Calendario de Actividad</div>
+                <input 
+                    type="date" 
+                    className="border p-2 rounded mt-2 w-full" 
+                    value={selectedDate} 
+                    onChange={e => setSelectedDate(e.target.value)} 
+                />
+                
+                <div className="mt-4 bg-gray-50 p-3 rounded min-h-[100px]">
                     {selectedDate ? (
                         eventsForDate.length ? (
-                            <ul>
+                            <ul className="space-y-2">
                                 {eventsForDate.map((ev, i) => (
-                                    <li key={i}>
-                                        {ev.type === 'gym' && <>Gym ({ev.group})</>}
-                                        {ev.type === 'compra' && <>Compra: {ev.item} ({ev.cost} 💰)</>}
-                                        {ev.type === 'misiones' && <>Misión completada: {ev.name}</>}
-                                        {ev.type === 'objetivo' && <>Objetivo completado: {ev.name}</>}
-                                        {ev.type === 'xp' && <>XP: {ev.amount} · {ev.meta && ev.meta.action}</>}
+                                    <li key={i} className="bg-white p-2 rounded border shadow-sm text-sm">
+                                        {ev.type === 'gym' && <span className="text-blue-600 font-bold">💪 Gym ({ev.group})</span>}
+                                        {ev.type === 'compra' && <span className="text-green-600 font-bold">🛒 Compra: {ev.item} (-{ev.cost}💰)</span>}
+                                        {ev.type === 'misiones' && <span className="text-purple-600 font-bold">📜 Misión: {ev.name}</span>}
+                                        {ev.type === 'objetivo' && <span className="text-orange-600 font-bold">🎯 Objetivo: {ev.name}</span>}
+                                        {ev.type === 'xp' && <span className="text-yellow-600 font-bold">⭐ +{ev.amount} XP {ev.meta?.action ? `(${ev.meta.action})` : ''}</span>}
                                     </li>
                                 ))}
                             </ul>
-                        ) : <div>No hay actividades para esta fecha.</div>
-                    ) : <div>Selecciona una fecha para ver actividades.</div>}
+                        ) : <div className="text-gray-500 text-center py-4">No hay actividades registradas este día.</div>
+                    ) : <div className="text-gray-500 text-center py-4">Selecciona una fecha para ver tu historial.</div>}
                 </div>
             </div>
         </section>

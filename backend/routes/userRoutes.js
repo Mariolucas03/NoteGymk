@@ -8,6 +8,7 @@ router.post('/user/:id/xp', ctrl.addXp);
 router.post('/user/:id/gym', ctrl.addGym);
 router.post('/user/:id/events', ctrl.addEvent);
 router.get('/user/:id/events', ctrl.getEvents);
+router.post('/user/:id/objectives', ctrl.updateObjectives);
 
 // --- RUTA NUEVA: CREAR USUARIO ---
 // Esta es la que conecta con el botón rojo del Frontend

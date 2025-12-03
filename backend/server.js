@@ -1,19 +1,32 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { connect } = require('./db/connection');
 const mongoose = require('mongoose');
-const routes = require('./routes/userRoutes');
+
+console.log("Intentando conectar a BBDD...");
+console.log("URI definida:", process.env.MONGO_URI ? "SÍ" : "NO (Undefined)");
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/rpg_life';
 const PORT = process.env.PORT || 4000;
 
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:3000', 'http://localhost:3005'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE']
+}));
 app.use(express.json());
 
+const authRoutes = require('./routes/authRoutes');
 
+app.get('/api/health', (req, res) => {
+    res.json({ status: "ok", db: mongoose.connection.readyState === 1 ? "connected" : "disconnected" });
+});
 
-app.use('/api', routes);
+app.use('/api/auth', authRoutes);
+app.use('/api', require('./routes/missionRoutes'));
+
 
 // Start
 (async () => {

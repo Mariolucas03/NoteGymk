@@ -87,6 +87,125 @@ exports.createMission = async (req, res) => {
 };
 
 // PUT /api/missions/:id/complete
+exports.completeMission = async (req, res) => {
+    try {
+        const mission = await Mission.findById(req.params.id);
+
+        if (!mission) {
+            return res.status(404).json({ message: 'Mission not found' });
+        }
+
+        if (mission.userId.toString() !== req.user.userId) {
+            return res.status(401).json({ message: 'Not authorized' });
+        }
+
+        if (mission.isCompleted) {
+            return res.status(400).json({ message: 'Mission already completed' });
+        }
+
+        // 1. Mark current mission as completed
+        mission.isCompleted = true;
+        mission.currentValue = mission.targetValue;
+        await mission.save();
+
+        /* 
+        // AUTO-LINKING TEMPORARILY DISABLED FOR STABILITY
+        // 2. Auto-Linking: Find other missions with SAME NAME but different frequency
+        // ...
+        */
+
+        // Fetch user once to apply all rewards
+        const user = await User.findById(req.user.userId);
+        let userUpdated = false;
+
+        // Rewards for the primary mission
+        user.coins += mission.coinReward;
+        user.xp += mission.xpReward;
+        userUpdated = true;
+
+        /*
+        // Linked missions rewards logic disabled
+        */
+
+        // Level Up Logic (Applied once after all XP gains)
+        let xpToNextLevel = user.level * 100;
+        while (user.xp >= xpToNextLevel) {
+            user.xp -= xpToNextLevel;
+            user.level += 1;
+            xpToNextLevel = user.level * 100;
+        }
+
+        if (userUpdated) {
+            await user.save();
+        }
+
+        res.json({
+            mission,
+            user: { ...user.toObject(), nextLevelXp: user.level * 100 }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+exports.incrementMission = async (req, res) => {
+    try {
+        const mission = await Mission.findById(req.params.id);
+
+        if (!mission) {
+            return res.status(404).json({ message: 'Mission not found' });
+        }
+
+        if (mission.userId.toString() !== req.user.userId) {
+            return res.status(401).json({ message: 'Not authorized' });
+        }
+
+        if (mission.isCompleted) {
+            return res.status(400).json({ message: 'Mission already completed' });
+        }
+
+        mission.currentValue += 1;
+
+        let userUpdated = false;
+        let user = null;
+
+        if (mission.currentValue >= mission.targetValue) {
+            mission.isCompleted = true;
+
+            // Give rewards
+            user = await User.findById(req.user.userId);
+            user.coins += mission.coinReward;
+            user.xp += mission.xpReward;
+
+            // Level Up Logic
+            let xpToNextLevel = user.level * 100;
+            while (user.xp >= xpToNextLevel) {
+                user.xp -= xpToNextLevel;
+                user.level += 1;
+                xpToNextLevel = user.level * 100;
+            }
+            await user.save();
+            userUpdated = true;
+        }
+
+        await mission.save();
+
+        if (!userUpdated) {
+            user = await User.findById(req.user.userId); // Get user anyway for response
+        }
+
+        res.json({
+            mission,
+            user: { ...user.toObject(), nextLevelXp: user.level * 100 }
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 // DELETE /api/missions/:id
 exports.deleteMission = async (req, res) => {
     try {

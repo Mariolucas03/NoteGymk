@@ -87,6 +87,7 @@ exports.createMission = async (req, res) => {
 };
 
 // PUT /api/missions/:id/complete
+// PUT /api/missions/:id/complete
 exports.completeMission = async (req, res) => {
     try {
         const mission = await Mission.findById(req.params.id);
@@ -108,26 +109,48 @@ exports.completeMission = async (req, res) => {
         mission.currentValue = mission.targetValue;
         await mission.save();
 
-        /* 
-        // AUTO-LINKING TEMPORARILY DISABLED FOR STABILITY
-        // 2. Auto-Linking: Find other missions with SAME NAME but different frequency
-        // ...
-        */
-
-        // Fetch user once to apply all rewards
+        // 2. Update User Stats (Initial)
         const user = await User.findById(req.user.userId);
-        let userUpdated = false;
-
-        // Rewards for the primary mission
         user.coins += mission.coinReward;
         user.xp += mission.xpReward;
-        userUpdated = true;
 
-        /*
-        // Linked missions rewards logic disabled
-        */
+        // 3. Auto-Linking Logic (Optimized & Atomic)
+        // Escape regex special characters
+        const escapedName = mission.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const linkFilter = {
+            userId: req.user.userId,
+            name: { $regex: new RegExp(`^${escapedName}$`, 'i') }, // Case-insensitive exact match
+            _id: { $ne: mission._id }, // Not the current one
+            isCompleted: false, // Only active missions
+            targetValue: { $gt: 1 } // Only missions with progress bars
+        };
 
-        // Level Up Logic (Applied once after all XP gains)
+        // A. Atomic Increment for ALL linked missions
+        await Mission.updateMany(linkFilter, { $inc: { currentValue: 1 } });
+
+        // B. Find newly completed missions (currentValue >= targetValue)
+        const newlyCompleted = await Mission.find({
+            ...linkFilter,
+            $expr: { $gte: ["$currentValue", "$targetValue"] }
+        });
+
+        // C. Apply Rewards & Mark Completed (Bulk)
+        if (newlyCompleted.length > 0) {
+            const completedIds = [];
+            for (const m of newlyCompleted) {
+                user.coins += m.coinReward;
+                user.xp += m.xpReward;
+                completedIds.push(m._id);
+            }
+
+            // Bulk set isCompleted = true
+            await Mission.updateMany(
+                { _id: { $in: completedIds } },
+                { $set: { isCompleted: true } }
+            );
+        }
+
+        // Level Up Logic (Applied after all rewards)
         let xpToNextLevel = user.level * 100;
         while (user.xp >= xpToNextLevel) {
             user.xp -= xpToNextLevel;
@@ -135,9 +158,7 @@ exports.completeMission = async (req, res) => {
             xpToNextLevel = user.level * 100;
         }
 
-        if (userUpdated) {
-            await user.save();
-        }
+        await user.save();
 
         res.json({
             mission,
@@ -148,7 +169,6 @@ exports.completeMission = async (req, res) => {
         res.status(500).json({ message: 'Server Error' });
     }
 };
-
 exports.incrementMission = async (req, res) => {
     try {
         const mission = await Mission.findById(req.params.id);

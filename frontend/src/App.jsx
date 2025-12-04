@@ -6,7 +6,8 @@ import MissionCard from './components/MissionCard';
 import AddMissionModal from './components/AddMissionModal';
 
 // --- API Helper ---
-const API_URL = process.env.REACT_APP_API_URL;
+// --- API Helper ---
+const API_URL = 'http://localhost:5000/api';
 
 const apiCall = async (endpoint, method = 'GET', body = null) => {
     const token = localStorage.getItem('token');
@@ -133,6 +134,9 @@ export default function App() {
             // Sync with server response
             setUser(data.user);
             setMissions(prev => prev.map(m => m._id === id ? data.mission : m));
+
+            // Force refresh for auto-linking
+            await fetchDashboard();
 
         } catch (err) {
             console.error("Error completing mission:", err);
@@ -276,7 +280,7 @@ export default function App() {
                                         : 'text-slate-500 hover:text-slate-300'
                                         }`}
                                 >
-                                    {freq === 'daily' ? 'Fija' :
+                                    {freq === 'daily' ? 'Diaria' :
                                         freq === 'weekly' ? 'Semanal' :
                                             freq === 'monthly' ? 'Mensual' : 'Anual'}
                                 </button>

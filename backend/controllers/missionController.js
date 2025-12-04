@@ -4,7 +4,16 @@ const User = require('../models/User');
 // GET /api/dashboard
 exports.getDashboard = async (req, res) => {
     try {
+        if (!req.user || !req.user.userId) {
+            return res.status(401).json({ message: 'Unauthorized: No user ID' });
+        }
+
         const user = await User.findById(req.user.userId).select('-password');
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
         // For now, get all missions. In future, filter by date for "daily" logic.
         const missions = await Mission.find({ userId: req.user.userId });
 
@@ -13,9 +22,13 @@ exports.getDashboard = async (req, res) => {
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Midnight today
 
         let lastVisit = null;
+        // Strict null check for lastStreakDate
         if (user.lastStreakDate) {
             const date = new Date(user.lastStreakDate);
-            lastVisit = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+            // Check if valid date object and valid timestamp
+            if (date instanceof Date && !isNaN(date.getTime())) {
+                lastVisit = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+            }
         }
 
         if (!lastVisit) {
@@ -29,7 +42,7 @@ exports.getDashboard = async (req, res) => {
 
             if (diffDays === 1) {
                 // Visited yesterday -> Increment
-                user.streak += 1;
+                user.streak = (user.streak || 0) + 1;
                 user.lastStreakDate = now;
                 await user.save();
             } else if (diffDays > 1) {
@@ -41,16 +54,20 @@ exports.getDashboard = async (req, res) => {
             // If diffDays === 0 (Today), do nothing
         }
 
-        // Calculate nextLevelXp
-        const nextLevelXp = user.level * 100;
+        // Calculate nextLevelXp (Safe Default)
+        const level = user.level || 1;
+        const nextLevelXp = level * 100;
 
-        res.json({
+        return res.json({
             user: { ...user.toObject(), nextLevelXp },
             missions
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server Error' });
+        console.error("CRITICAL ERROR in getDashboard:", err);
+        // Ensure we send JSON, not HTML, even on crash
+        if (!res.headersSent) {
+            return res.status(500).json({ message: 'Server Error', error: err.message || 'Unknown Error' });
+        }
     }
 };
 
@@ -126,6 +143,7 @@ exports.completeMission = async (req, res) => {
         };
 
         // A. Atomic Increment for ALL linked missions
+        console.log(`--- AUTO-LINKING: Incrementing linked missions for '${mission.name}' ---`);
         await Mission.updateMany(linkFilter, { $inc: { currentValue: 1 } });
 
         // B. Find newly completed missions (currentValue >= targetValue)

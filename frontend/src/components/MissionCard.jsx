@@ -56,7 +56,7 @@ export default function MissionCard({ mission, onComplete, onDelete, onIncrement
                                     ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
                                     : 'bg-orange-500/10 border-orange-500/30 text-orange-400'
                                     }`}>
-                                    {mission.frequency === 'daily' ? 'FIJA' :
+                                    {mission.frequency === 'daily' ? 'DIARIA' :
                                         mission.frequency === 'weekly' ? 'SEMANAL' :
                                             mission.frequency === 'monthly' ? 'MENSUAL' : 'ANUAL'}
                                 </span>

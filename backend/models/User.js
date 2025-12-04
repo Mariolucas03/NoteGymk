@@ -21,6 +21,10 @@ const userSchema = new mongoose.Schema({
     maxHealth: { type: Number, default: 100 },
     streak: { type: Number, default: 0 },
     lastStreakDate: { type: Date },
+
+    // Daily Login Bonus
+    dailyStreak: { type: Number, default: 1 },
+    lastDailyClaim: { type: Date, default: null },
     // NO BINARY DATA - Only references if needed later
 }, { timestamps: true });
 

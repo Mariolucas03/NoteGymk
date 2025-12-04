@@ -4,9 +4,10 @@ import Header from './components/Header';
 import FooterNav from './components/FooterNav';
 import MissionCard from './components/MissionCard';
 import AddMissionModal from './components/AddMissionModal';
+import DailyRewardModal from './components/DailyRewardModal';
 
 // --- API Helper ---
-// --- API Helper ---
+// FORZAR CONEXIÓN LOCAL
 const API_URL = 'http://localhost:5000/api';
 
 const apiCall = async (endpoint, method = 'GET', body = null) => {
@@ -47,6 +48,7 @@ export default function App() {
     const [activeFooterTab, setActiveFooterTab] = useState('home');
     const [missionFrequency, setMissionFrequency] = useState('daily'); // Active Tab for missions
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDailyModalOpen, setIsDailyModalOpen] = useState(false);
 
     // Auth Form State
     const [isLogin, setIsLogin] = useState(true);
@@ -72,10 +74,47 @@ export default function App() {
             const data = await apiCall('/dashboard');
             setUser(data.user);
             setMissions(data.missions);
+
+            // Check Daily Reward
+            checkDailyReward(data.user);
+
         } catch (err) {
             console.error("Error fetching dashboard:", err);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const checkDailyReward = (userData) => {
+        if (!userData) return;
+
+        const lastClaim = userData.lastDailyClaim ? new Date(userData.lastDailyClaim) : null;
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        let alreadyClaimed = false;
+        if (lastClaim) {
+            const lastClaimDate = new Date(lastClaim.getFullYear(), lastClaim.getMonth(), lastClaim.getDate());
+            if (lastClaimDate.getTime() === today.getTime()) {
+                alreadyClaimed = true;
+            }
+        }
+
+        if (!alreadyClaimed) {
+            setIsDailyModalOpen(true);
+        }
+    };
+
+    const handleClaimDaily = async () => {
+        try {
+            const data = await apiCall('/user/claim-daily', 'POST');
+            // Update user stats with response
+            setUser(data.user);
+            setIsDailyModalOpen(false);
+        } catch (err) {
+            console.error("Error claiming reward:", err);
+            // Close anyway if error (e.g. already claimed)
+            setIsDailyModalOpen(false);
         }
     };
 
@@ -293,6 +332,10 @@ export default function App() {
                             <Plus size={20} />
                         </button>
                     </div>
+                    {/* DEBUG BUTTON */}
+                    <button onClick={() => setIsDailyModalOpen(true)} className="text-xs text-slate-600 underline mb-2 w-full text-center hover:text-violet-400 transition-colors">
+                        Test Daily Reward
+                    </button>
                 </div>
 
                 {/* Missions List */}
@@ -333,6 +376,13 @@ export default function App() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onAdd={handleAddMission}
+            />
+
+            <DailyRewardModal
+                isOpen={isDailyModalOpen}
+                onClose={() => setIsDailyModalOpen(false)}
+                onClaim={handleClaimDaily}
+                userStreak={user?.dailyStreak}
             />
 
             <FooterNav activeTab={activeFooterTab} onTabChange={setActiveFooterTab} />

@@ -3,16 +3,21 @@ const User = require('../models/User');
 
 // GET /api/dashboard
 exports.getDashboard = async (req, res) => {
+    console.log("🔴🔴🔴 DENTRO DE GET DASHBOARD 🔴🔴🔴");
+    console.log("👉 ID Solicitado:", req.user.userId);
     try {
         if (!req.user || !req.user.userId) {
             return res.status(401).json({ message: 'Unauthorized: No user ID' });
         }
 
         const user = await User.findById(req.user.userId).select('-password');
+        console.log("👉 Usuario Encontrado:", user ? "SÍ (" + user.email + ")" : "NO (NULL)");
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            console.log("!!! ALERTA: El usuario con este ID no está en la base de datos local.");
+            return res.status(404).json({ message: 'Usuario no encontrado en DB local' });
         }
+        console.log("💰 Datos:", { coins: user.coins, xp: user.xp, level: user.level });
 
         // For now, get all missions. In future, filter by date for "daily" logic.
         const missions = await Mission.find({ userId: req.user.userId });
@@ -63,7 +68,7 @@ exports.getDashboard = async (req, res) => {
             missions
         });
     } catch (err) {
-        console.error("CRITICAL ERROR in getDashboard:", err);
+        console.error("❌ ERROR EN DASHBOARD:", err);
         // Ensure we send JSON, not HTML, even on crash
         if (!res.headersSent) {
             return res.status(500).json({ message: 'Server Error', error: err.message || 'Unknown Error' });

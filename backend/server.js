@@ -21,7 +21,8 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api', require('./routes/missionRoutes'));
+app.use('/api', require('./routes/missionRoutes')); // Mounts /dashboard and /missions
+app.use('/api/user', require('./routes/userRoutes'));
 
 
 

@@ -108,6 +108,7 @@ exports.completeMission = async (req, res) => {
         mission.currentValue = mission.targetValue;
         await mission.save();
 
+        /*
         // 2. Auto-Linking: Find other missions with SAME NAME but different frequency
         // Escape special regex characters to ensure exact match
         const escapedName = mission.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -128,6 +129,7 @@ exports.completeMission = async (req, res) => {
 
         const linkedMissions = await Mission.find(query);
         console.log("Misiones vinculadas encontradas:", linkedMissions.length);
+        */
 
         // Fetch user once to apply all rewards
         const user = await User.findById(req.user.userId);
@@ -138,6 +140,7 @@ exports.completeMission = async (req, res) => {
         user.xp += mission.xpReward;
         userUpdated = true;
 
+        /*
         for (const parentMission of linkedMissions) {
             // Ensure currentValue is a number
             parentMission.currentValue = (parentMission.currentValue || 0) + 1;
@@ -152,6 +155,7 @@ exports.completeMission = async (req, res) => {
             }
             await parentMission.save();
         }
+        */
 
         // Level Up Logic (Applied once after all XP gains)
         let xpToNextLevel = user.level * 100;

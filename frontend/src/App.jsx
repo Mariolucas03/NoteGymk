@@ -198,14 +198,16 @@ export default function App() {
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 className="bg-slate-950 border border-slate-700 text-white p-4 rounded-xl outline-none focus:border-violet-500 transition-colors"
+                                required
                             />
                         )}
                         <input
-                            type="text"
+                            type="email"
                             placeholder="Email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className="bg-slate-950 border border-slate-700 text-white p-4 rounded-xl outline-none focus:border-violet-500 transition-colors"
+                            required
                         />
                         <input
                             type="password"
@@ -213,6 +215,7 @@ export default function App() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             className="bg-slate-950 border border-slate-700 text-white p-4 rounded-xl outline-none focus:border-violet-500 transition-colors"
+                            required
                         />
 
                         <button

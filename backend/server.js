@@ -11,11 +11,7 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/rpg_life';
 const PORT = process.env.PORT || 4000;
 
 const app = express();
-app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3005'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE']
-}));
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 const authRoutes = require('./routes/authRoutes');

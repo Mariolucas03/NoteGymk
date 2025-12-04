@@ -6,7 +6,7 @@ import MissionCard from './components/MissionCard';
 import AddMissionModal from './components/AddMissionModal';
 
 // --- API Helper ---
-const API_URL = 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL;
 
 const apiCall = async (endpoint, method = 'GET', body = null) => {
     const token = localStorage.getItem('token');

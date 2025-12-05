@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Mission = require('../models/Mission');
 
 // Helper: Calculate reward for a specific day
 const getRewardForDay = (day) => {
@@ -93,6 +94,88 @@ exports.getRewardsPreview = async (req, res) => {
         res.json(rewards);
     } catch (err) {
         console.error(err);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// GET /api/user/summary
+exports.getDailySummary = async (req, res) => {
+    try {
+        const { date } = req.query; // 'yesterday'
+        const userId = req.user.userId;
+
+        // Calculate Date Range
+        let startDate, endDate;
+        const now = new Date();
+
+        if (date === 'yesterday') {
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            yesterday.setHours(0, 0, 0, 0);
+
+            startDate = yesterday;
+
+            const endOfYesterday = new Date(yesterday);
+            endOfYesterday.setHours(23, 59, 59, 999);
+            endDate = endOfYesterday;
+        } else {
+            // Fallback to today or handle other dates if needed
+            const today = new Date(now);
+            today.setHours(0, 0, 0, 0);
+            startDate = today;
+            endDate = new Date();
+        }
+
+        // 1. Find Completed Missions (Victories)
+        const completed = await Mission.find({
+            userId,
+            isCompleted: true,
+            updatedAt: { $gte: startDate, $lte: endDate }
+        });
+
+        // 2. Find Failed Missions (Defeats)
+        const failed = await Mission.find({
+            userId,
+            isFailed: true,
+            expiresAt: { $gte: startDate, $lte: endDate }
+        });
+
+        // 3. Calculate Stats
+        let totalXP = 0;
+        let totalCoins = 0;
+        let totalLivesLost = 0;
+
+        completed.forEach(m => {
+            totalXP += m.xpReward;
+            totalCoins += m.coinReward;
+        });
+
+        // Calculate theoretical damage from failed missions
+        // Note: Actual damage might have been clamped by current lives, but we show raw penalty here for clarity
+        failed.forEach(m => {
+            let damage = 0;
+            switch (m.difficulty) {
+                case 'facil': damage = 10; break;
+                case 'media': damage = 5; break;
+                case 'dificil': damage = 3; break;
+                case 'muy_dificil': damage = 1; break;
+                default: damage = 5;
+            }
+            totalLivesLost += damage;
+        });
+
+        res.json({
+            completed,
+            failed,
+            stats: {
+                xp: totalXP,
+                coins: totalCoins,
+                livesLost: totalLivesLost
+            }
+        });
+
+    } catch (err) {
+        console.error("Error getting summary:", err);
         res.status(500).json({ message: 'Server Error' });
     }
 };

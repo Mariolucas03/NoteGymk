@@ -15,17 +15,18 @@ app.use(cors({ origin: /^http:\/\/localhost:\d+$/ }));
 app.use(express.json());
 
 const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+const missionRoutes = require('./routes/missionRoutes');
+const shopRoutes = require('./routes/shopRoutes');
 
 app.get('/api/health', (req, res) => {
     res.json({ status: "ok", db: mongoose.connection.readyState === 1 ? "connected" : "disconnected" });
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api', require('./routes/missionRoutes')); // Mounts /dashboard and /missions
-app.use('/api/user', require('./routes/userRoutes'));
-
-
-
+app.use('/api/user', userRoutes);
+app.use('/api/shop', shopRoutes);
+app.use('/api', missionRoutes); // Handles /dashboard and /missions
 
 // Global API 404 Handler
 app.use('/api', (req, res) => {

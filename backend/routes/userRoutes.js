@@ -8,5 +8,6 @@ router.use(authMiddleware);
 
 router.post('/claim-daily', userController.claimDailyReward);
 router.get('/rewards-preview', userController.getRewardsPreview);
+router.get('/summary', userController.getDailySummary);
 
 module.exports = router;

@@ -19,44 +19,82 @@ exports.getDashboard = async (req, res) => {
         }
         console.log("💰 Datos:", { coins: user.coins, xp: user.xp, level: user.level });
 
+        // --- JUICIO FINAL: Penalización por Misiones Caducadas ---
+        const checkDate = new Date();
+        const expiredMissions = await Mission.find({
+            userId: req.user.userId,
+            expiresAt: { $lt: checkDate },
+            isCompleted: false,
+            isFailed: false
+        });
+
+        if (expiredMissions.length > 0) {
+            console.log(`⏳ Encontradas ${expiredMissions.length} misiones caducadas. Aplicando castigo...`);
+            let totalDamage = 0;
+
+            for (const mission of expiredMissions) {
+                let damage = 0;
+                // Reglas invertidas de daño
+                switch (mission.difficulty) {
+                    case 'facil': damage = 10; break;
+                    case 'media': damage = 5; break;
+                    case 'dificil': damage = 3; break;
+                    case 'muy_dificil': damage = 1; break;
+                    default: damage = 5;
+                }
+
+                totalDamage += damage;
+                mission.isFailed = true;
+                await mission.save(); // Guardar estado fallido
+            }
+
+            if (totalDamage > 0) {
+                user.lives = Math.max(0, (user.lives || 0) - totalDamage);
+                await user.save();
+                console.log(`💔 Usuario perdió ${totalDamage} vidas. Restantes: ${user.lives}`);
+            }
+        }
+        // ---------------------------------------------------------
+
         // For now, get all missions. In future, filter by date for "daily" logic.
         const missions = await Mission.find({ userId: req.user.userId });
 
         // Streak Logic
         const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Midnight today
+        const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
 
-        let lastVisit = null;
-        // Strict null check for lastStreakDate
+        let lastVisitStr = null;
         if (user.lastStreakDate) {
             const date = new Date(user.lastStreakDate);
-            // Check if valid date object and valid timestamp
-            if (date instanceof Date && !isNaN(date.getTime())) {
-                lastVisit = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+            if (!isNaN(date.getTime())) {
+                lastVisitStr = date.toISOString().split('T')[0];
             }
         }
 
-        if (!lastVisit) {
-            // First time or no previous record
+        if (!lastVisitStr) {
+            // First time
             user.streak = 1;
             user.lastStreakDate = now;
             await user.save();
         } else {
-            const diffTime = Math.abs(today - lastVisit);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (todayStr === lastVisitStr) {
+                // Already visited today, do nothing
+            } else {
+                // Check if visited yesterday
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-            if (diffDays === 1) {
-                // Visited yesterday -> Increment
-                user.streak = (user.streak || 0) + 1;
-                user.lastStreakDate = now;
-                await user.save();
-            } else if (diffDays > 1) {
-                // Missed a day -> Reset
-                user.streak = 1;
+                if (lastVisitStr === yesterdayStr) {
+                    // Visited yesterday -> Increment
+                    user.streak = (user.streak || 0) + 1;
+                } else {
+                    // Missed a day -> Reset
+                    user.streak = 1;
+                }
                 user.lastStreakDate = now;
                 await user.save();
             }
-            // If diffDays === 0 (Today), do nothing
         }
 
         // Calculate nextLevelXp (Safe Default)
@@ -108,7 +146,6 @@ exports.createMission = async (req, res) => {
     }
 };
 
-// PUT /api/missions/:id/complete
 // PUT /api/missions/:id/complete
 exports.completeMission = async (req, res) => {
     try {

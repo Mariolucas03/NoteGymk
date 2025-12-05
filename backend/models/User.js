@@ -16,7 +16,9 @@ const userSchema = new mongoose.Schema({
     },
     xp: { type: Number, default: 0 },
     level: { type: Number, default: 1 },
+    nextLevelXp: { type: Number, default: 100 },
     coins: { type: Number, default: 0 },
+    lives: { type: Number, default: 100 },
     health: { type: Number, default: 100 },
     maxHealth: { type: Number, default: 100 },
     streak: { type: Number, default: 0 },
@@ -25,7 +27,22 @@ const userSchema = new mongoose.Schema({
     // Daily Login Bonus
     dailyStreak: { type: Number, default: 1 },
     lastDailyClaim: { type: Date, default: null },
-    // NO BINARY DATA - Only references if needed later
+
+    // Inventory
+    // Inventory
+    inventory: [{
+        name: { type: String, required: true },
+        cost: Number,
+        icon: String,
+        category: { type: String, default: 'general' },
+        type: { type: String, default: 'static' },
+        quantity: { type: Number, default: 1 }
+    }],
+
+    // Pet
+    petUrl: { type: String },
+    avatarUrl: { type: String }
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

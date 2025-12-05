@@ -7,9 +7,18 @@ import {
     TrailingActions
 } from 'react-swipeable-list';
 import 'react-swipeable-list/dist/styles.css';
-import { Check, Trash2, Zap, Coins, Plus } from 'lucide-react';
+import { Check, Trash2, Zap, Coins, Plus, Heart } from 'lucide-react';
 
 export default function MissionCard({ mission, onComplete, onDelete, onIncrement }) {
+
+    const LIFE_LOSS_MAP = {
+        'facil': 10,
+        'media': 5,
+        'dificil': 3,
+        'muy_dificil': 1
+    };
+
+    const lifeLoss = LIFE_LOSS_MAP[mission.difficulty] || 5;
 
     // Action: Swipe Right (Complete or Increment)
     const leadingActions = () => (
@@ -91,6 +100,12 @@ export default function MissionCard({ mission, onComplete, onDelete, onIncrement
                                     <span>+{mission.coinReward}</span>
                                     <Coins size={14} fill="currentColor" />
                                 </div>
+                                {!mission.isCompleted && (
+                                    <div className="flex items-center gap-1 text-red-500 font-bold text-xs mt-1 animate-pulse" title="Penalización si caduca">
+                                        <span>-{lifeLoss}</span>
+                                        <Heart size={12} fill="currentColor" />
+                                    </div>
+                                )}
                             </div>
                         </div>
 

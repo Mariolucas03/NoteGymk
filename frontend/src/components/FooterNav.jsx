@@ -4,7 +4,7 @@ import { Home, Target, Utensils, Dumbbell, ShoppingBag } from 'lucide-react';
 export default function FooterNav({ activeTab, onTabChange }) {
     const navItems = [
         { id: 'home', icon: Home, label: 'Inicio' },
-        { id: 'goals', icon: Target, label: 'Objetivos' },
+        { id: 'goals', icon: Target, label: 'Minijuegos' },
         { id: 'food', icon: Utensils, label: 'Comida' },
         { id: 'gym', icon: Dumbbell, label: 'Gym' },
         { id: 'shop', icon: ShoppingBag, label: 'Tienda' },

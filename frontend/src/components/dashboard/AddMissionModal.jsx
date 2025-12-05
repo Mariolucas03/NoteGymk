@@ -225,6 +225,13 @@ export default function AddMissionModal({ isOpen, onClose, onAdd }) {
                                 <option value="dificil">Difícil</option>
                                 <option value="muy_dificil">Muy Difícil</option>
                             </select>
+
+                            {/* Penalty Feedback */}
+                            <p className="text-[10px] text-red-400 font-bold mt-2 text-center animate-pulse">
+                                ⚠️ Si esta misión caduca, perderás {
+                                    { 'facil': 10, 'media': 5, 'dificil': 3, 'muy_dificil': 1 }[difficulty] || 5
+                                } ❤️
+                            </p>
                         </div>
 
                         {/* Rewards Preview */}

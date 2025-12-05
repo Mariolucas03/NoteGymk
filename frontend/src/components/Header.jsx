@@ -1,65 +1,54 @@
 import React from 'react';
 import { Heart, Coins, Star } from 'lucide-react';
+import { useUser } from '../context/UserContext';
 
-export default function Header({ user }) {
-    // Logic for Level Title
-    const getLevelTitle = (level) => {
-        if (level <= 5) return "Principiante";
-        if (level <= 10) return "Avanzado";
-        if (level <= 20) return "Experto";
-        return "Maestro";
-    };
+export default function Header() {
+    const { user } = useUser();
 
-    // Calculate XP progress percentage
-    const xpPercentage = Math.min((user.xp / user.nextLevelXp) * 100, 100);
+    // Valores por defecto para evitar errores si user es null/undefined
+    const level = user?.level || 1;
+    const xp = user?.xp || 0;
+    const nextLevelXp = user?.nextLevelXp || (level * 100);
+    const coins = user?.coins || 0;
+    const lives = user?.lives || 5; // Default to 5 if undefined
+
+    const progress = Math.min((xp / nextLevelXp) * 100, 100);
 
     return (
-        <header className="fixed top-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-b border-white/10 z-50 px-4 py-3 shadow-lg">
-            <div className="flex items-center justify-between max-w-md mx-auto">
-
-                {/* Left: Avatar & Level */}
+        <header className="fixed top-0 left-0 right-0 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 z-50 px-4 py-3">
+            <div className="max-w-md mx-auto flex items-center justify-between">
+                {/* User Info */}
                 <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <img
-                            src={user.avatarUrl || "https://placehold.co/100"}
-                            alt="User"
-                            className="w-12 h-12 rounded-full border-2 border-violet-500 object-cover"
-                        />
-                        {/* Pet Avatar (Small overlay) */}
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-slate-800 rounded-full border border-slate-600 flex items-center justify-center overflow-hidden">
-                            <img src={user.petUrl || "https://placehold.co/50"} alt="Pet" className="w-full h-full object-cover" />
-                        </div>
+                    <div className="w-10 h-10 bg-violet-600 rounded-full flex items-center justify-center text-lg font-bold text-white shadow-lg shadow-violet-900/50">
+                        {level}
                     </div>
-
-                    <div className="flex flex-col">
-                        <span className="text-xs font-bold text-violet-400 uppercase tracking-wider">Lvl {user.level}</span>
-                        <span className="text-sm font-medium text-slate-200">{getLevelTitle(user.level)}</span>
+                    <div>
+                        <h1 className="font-bold text-sm text-white leading-tight">{user?.name || 'Héroe'}</h1>
+                        <div className="w-32 h-4 bg-slate-800 rounded-full mt-1 overflow-hidden relative">
+                            <div
+                                className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-500"
+                                style={{ width: `${progress}%` }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-[10px] font-bold text-white drop-shadow-md">
+                                    {xp} / {nextLevelXp} XP
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* Right: Stats */}
-                <div className="flex flex-col items-end gap-1">
-                    <div className="flex items-center gap-3 text-xs font-bold">
-                        <div className="flex items-center gap-1 text-red-400">
-                            <Heart size={14} fill="currentColor" />
-                            <span>{user.health}/{user.maxHealth}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-yellow-400">
-                            <Coins size={14} fill="currentColor" />
-                            <span>{user.coins}</span>
-                        </div>
+                {/* Stats */}
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 bg-slate-800/50 px-2 py-1 rounded-lg border border-slate-700/50">
+                        <span className="text-xs font-bold text-yellow-100">{coins}</span>
+                        <Coins size={14} className="text-yellow-400" fill="currentColor" />
                     </div>
-
-                    {/* XP Bar */}
-                    <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden relative mt-1">
-                        <div
-                            className="h-full bg-gradient-to-r from-violet-600 to-fuchsia-500 transition-all duration-500"
-                            style={{ width: `${xpPercentage}%` }}
-                        />
+                    <div className="flex items-center gap-1 bg-slate-800/50 px-2 py-1 rounded-lg border border-slate-700/50">
+                        <span className="text-xs font-bold text-red-100">{lives}</span>
+                        <Heart size={14} className="text-red-500" fill="currentColor" />
                     </div>
-                    <span className="text-[10px] text-slate-500">{user.xp} / {user.nextLevelXp} XP</span>
                 </div>
-
             </div>
         </header>
     );

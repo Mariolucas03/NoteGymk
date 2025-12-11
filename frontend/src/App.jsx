@@ -1,95 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import Auth from './pages/Auth';
-import Dashboard from './pages/Dashboard';
-import Shop from './pages/Shop';
-import FooterNav from './components/FooterNav';
-import Header from './components/Header';
-import AddMissionModal from './components/dashboard/AddMissionModal';
-import DailyRewardModal from './components/dashboard/DailyRewardModal';
-import { createMission, claimDailyReward } from './services/missionService';
-import { UserProvider, useUser } from './context/UserContext';
+import { useState, useEffect } from 'react';
+import { API_BASE_URL } from './config'; // Asegúrate de tener el config.js que hicimos antes
 
-function MainContent() {
-    const { user, token, loading, refreshUser } = useUser();
-    const [view, setView] = useState('home'); // 'home' | 'shop'
+function App() {
+    const [mensajeBackend, setMensajeBackend] = useState('Esperando respuesta del servidor...');
 
-    // Modales Globales (UI State)
-    const [isMissionModalOpen, setIsMissionModalOpen] = useState(false);
-    const [isDailyModalOpen, setIsDailyModalOpen] = useState(false);
-
-    // Check Daily Reward
     useEffect(() => {
-        if (user) {
-            checkDailyReward(user);
-        }
-    }, [user]);
-
-    const checkDailyReward = (userData) => {
-        if (!userData) return;
-        const lastClaim = userData.lastDailyClaim ? new Date(userData.lastDailyClaim) : null;
-        const today = new Date();
-        const isSameDay = lastClaim && lastClaim.toDateString() === today.toDateString();
-
-        if (!isSameDay) {
-            setIsDailyModalOpen(true);
-        }
-    };
-
-    const handleClaimDaily = async () => {
-        try {
-            await claimDailyReward();
-            await refreshUser();
-            setIsDailyModalOpen(false);
-        } catch (err) {
-            console.log("Intento de reclamo fallido:", err.message);
-
-            if (err.message && err.message.includes('Already claimed')) {
-                alert("¡Ya has reclamado tu recompensa de hoy! Vuelve mañana.");
-            } else {
-                alert("Error al reclamar: " + (err.message || "Error desconocido"));
-            }
-
-            setIsDailyModalOpen(false);
-        }
-    };
-
-    if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Cargando...</div>;
-    if (!token) return <Auth onSuccess={(u, t) => window.location.reload()} />; // Simple reload to trigger context init, or use login() from context if passed to Auth
+        // Petición simple a la raíz de tu backend
+        fetch(`${API_BASE_URL}/`)
+            .then(res => res.text()) // Esperamos texto simple
+            .then(data => setMensajeBackend(data))
+            .catch(err => {
+                console.error(err);
+                setMensajeBackend('Error: No se pudo conectar con el Backend');
+            });
+    }, []);
 
     return (
-        <div className="min-h-screen bg-slate-950 font-sans text-slate-200 pb-24 pt-20">
-            <Header />
-            <main className="max-w-md mx-auto px-4">
-                {view === 'home' && (
-                    <Dashboard
-                        onOpenMissionModal={() => setIsMissionModalOpen(true)}
-                    />
-                )}
-                {view === 'shop' && (
-                    <Shop />
-                )}
-            </main>
-            <AddMissionModal
-                isOpen={isMissionModalOpen}
-                onClose={() => setIsMissionModalOpen(false)}
-                onAdd={async (data) => { await createMission(data); refreshUser(); }}
-            />
+        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
+            <h1 className="text-4xl font-bold mb-4 text-blue-500">Proyecto Base - Full Stack</h1>
 
-            <DailyRewardModal
-                isOpen={isDailyModalOpen}
-                onClose={() => setIsDailyModalOpen(false)}
-                onClaim={handleClaimDaily}
-                userStreak={user?.dailyStreak}
-            />
-            <FooterNav activeTab={view} onTabChange={setView} />
+            <div className="border border-gray-700 p-6 rounded-lg bg-gray-900 max-w-md text-center">
+                <p className="text-gray-400 text-sm mb-2">Estado de la conexión:</p>
+                <p className="text-xl font-mono text-green-400">{mensajeBackend}</p>
+            </div>
+
+            <p className="mt-8 text-gray-500">
+                Sin Login. Sin Usuarios. Solo conexión pura.
+            </p>
         </div>
     );
 }
 
-export default function App() {
-    return (
-        <UserProvider>
-            <MainContent />
-        </UserProvider>
-    );
-}
+export default App;

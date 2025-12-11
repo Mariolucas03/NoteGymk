@@ -1,21 +1,39 @@
 require('dotenv').config();
+console.log("🔍 DEPURACIÓN URI:", process.env.MONGO_URI);
 const express = require('express');
 const cors = require('cors');
-require('./db/connection'); // Mantiene viva la conexión a Mongo
+const connectDB = require('./config/db'); // <--- AQUI EL CAMBIO: Usamos la nueva config
 
 const app = express();
 
-app.use(cors());
+// 1. Conectar a Base de Datos
+connectDB();
+
+// 2. Middlewares
+// Configuración CORS para permitir que tu Frontend (puerto 3005) hable con el Backend
+app.use(cors({
+    origin: 'http://localhost:3005',
+    credentials: true
+}));
 app.use(express.json());
 
-// Única ruta de prueba (Esto soluciona el error "Cannot GET /")
+// 3. Rutas
+// Ruta de prueba inicial
 app.get('/', (req, res) => {
-    res.send('✅ Backend conectado a MongoDB y funcionando en Vercel/Render');
+    res.send('✅ Backend RPG conectado y funcionando');
 });
 
-// CAMBIO IMPORTANTE: Ponemos 5000 para que coincida con tu Frontend
-const PORT = process.env.PORT || 5000;
+// Rutas de la API (Descomentaremos la siguiente línea en el próximo paso)
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/users', require('./routes/users'));
+app.use('/api/daily', require('./routes/daily'));
+app.use('/api/gym', require('./routes/gym'));
+app.use('/api/missions', require('./routes/missions'));
+app.use('/api/food', require('./routes/food'));
+app.use('/api/shop', require('./routes/shop'));
 
+// 4. Arrancar servidor
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor limpio corriendo en puerto ${PORT}`);
+    console.log(`🚀 Servidor RPG corriendo en puerto ${PORT}`);
 });

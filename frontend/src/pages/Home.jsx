@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { useOutletContext, Link, useLocation } from 'react-router-dom';
 import {
     Settings, X, Eye, EyeOff, ToggleLeft, ToggleRight,
-    ChevronDown, ChevronUp, Dumbbell, Utensils, Trophy, Zap,
-    MapPin, Gauge, Timer, Activity, Flame
+    Dumbbell, Utensils, Trophy, Activity, CheckCircle, Zap, Coins, Clock, BarChart3, Gift
 } from 'lucide-react';
 import api from '../services/api';
+import { getRewardForDay } from '../utils/rewardsGenerator'; // Asegúrate de tener este archivo creado
 
 // --- DND KIT ---
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, TouchSensor } from '@dnd-kit/core';
@@ -29,7 +29,10 @@ export default function Home() {
     const { user, setUser } = useOutletContext();
     const location = useLocation();
 
+    // Estados para Recompensa Diaria
     const [showRewardModal, setShowRewardModal] = useState(false);
+    const [rewardData, setRewardData] = useState(null);
+
     const [dailyData, setDailyData] = useState(null);
     const [showSettings, setShowSettings] = useState(false);
 
@@ -63,28 +66,124 @@ export default function Home() {
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
-    // CARGA DE DATOS
+    // --- HELPER: Calcular Día Actual del Usuario ---
+    const getUserCurrentDay = () => {
+        if (!user || !user.createdAt) return 1;
+        const start = new Date(user.createdAt);
+        const now = new Date();
+        const diffTime = Math.abs(now - start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays || 1;
+    };
+
+    // --- HELPER: Verificar si ya reclamó hoy ---
+    const hasClaimedToday = () => {
+        if (!user || !user.dailyRewards || !user.dailyRewards.lastClaimDate) return false;
+        const last = new Date(user.dailyRewards.lastClaimDate);
+        const today = new Date();
+        return (
+            last.getDate() === today.getDate() &&
+            last.getMonth() === today.getMonth() &&
+            last.getFullYear() === today.getFullYear()
+        );
+    };
+
+    // 1. LÓGICA DE RECOMPENSA DIARIA (AUTOMÁTICA AL ENTRAR)
+    useEffect(() => {
+        if (!user) return;
+
+        const autoClaim = async () => {
+            if (!hasClaimedToday()) {
+                try {
+                    const currentDay = getUserCurrentDay();
+                    const reward = getRewardForDay(currentDay);
+
+                    const res = await api.post('/users/claim-daily');
+
+                    setRewardData({
+                        currentDay: currentDay,
+                        claimedDays: res.data.dailyRewards?.claimedDays || [],
+                        rewardOfDay: reward,
+                        message: "¡Día " + currentDay + " Completado!",
+                        subMessage: "Recompensa diaria reclamada.",
+                        buttonText: "¡GENIAL!"
+                    });
+                    setShowRewardModal(true);
+                    setUser(prev => ({ ...prev, ...res.data }));
+                } catch (error) {
+                    console.log("Error auto-claim:", error);
+                }
+            }
+        };
+        autoClaim();
+    }, [user?._id]);
+
+    // 2. BOTÓN MANUAL (REGALO)
+    const handleManualClick = () => {
+        const currentDay = getUserCurrentDay();
+        const claimedDays = user.dailyRewards?.claimedDays || [];
+        const reward = getRewardForDay(currentDay);
+
+        if (hasClaimedToday()) {
+            // MODO SOLO VER (Informativo)
+            setRewardData({
+                currentDay: currentDay,
+                claimedDays: claimedDays,
+                rewardOfDay: reward,
+                message: "Calendario de Premios",
+                subMessage: "Vuelve mañana para el siguiente día.",
+                buttonText: "CERRAR",
+                isViewOnly: true
+            });
+            setShowRewardModal(true);
+        } else {
+            // MODO RECLAMAR (Fallback manual)
+            const claim = async () => {
+                try {
+                    const res = await api.post('/users/claim-daily');
+                    setRewardData({
+                        currentDay: currentDay,
+                        claimedDays: res.data.dailyRewards?.claimedDays || [],
+                        rewardOfDay: reward,
+                        message: "¡Día " + currentDay + " Reclamado!",
+                        subMessage: "Has recogido tu premio manual.",
+                        buttonText: "¡VAMOS!"
+                    });
+                    setShowRewardModal(true);
+                    setUser(prev => ({ ...prev, ...res.data }));
+                } catch (error) {
+                    setRewardData({
+                        currentDay: currentDay,
+                        claimedDays: claimedDays,
+                        rewardOfDay: reward,
+                        message: "Ya Procesado",
+                        subMessage: "Tu recompensa ya está en tu cuenta.",
+                        buttonText: "ENTENDIDO",
+                        isViewOnly: true
+                    });
+                    setShowRewardModal(true);
+                }
+            };
+            claim();
+        }
+    };
+
+    // 3. CARGA DE DATOS DIARIOS (WIDGETS)
     useEffect(() => {
         const fetchDailyData = async () => {
             try {
                 const res = await api.get('/daily');
                 setDailyData(res.data);
 
-                // --- CORRECCIÓN IMPORTANTE ---
-                // No sobrescribimos el usuario, lo MEZCLAMOS.
-                // Mantenemos el nombre (prev) y actualizamos solo lo nuevo (res.data.user)
                 if (res.data.user) {
-                    setUser(prev => ({
-                        ...prev,           // Mantiene username, email, etc.
-                        ...res.data.user   // Actualiza coins, xp, level...
-                    }));
+                    setUser(prev => ({ ...prev, ...res.data.user }));
                 }
             } catch (error) { console.error("Error cargando daily log", error); }
         };
         fetchDailyData();
     }, [setUser, location.key]);
 
-    // MEDIANOCHE
+    // 4. MEDIANOCHE
     useEffect(() => {
         const checkMidnight = () => {
             const now = new Date();
@@ -97,9 +196,7 @@ export default function Home() {
     }, []);
 
     const handleUserUpdate = (u) => {
-        // Aquí también mezclamos por seguridad
         setUser(prev => ({ ...prev, ...u }));
-        // localStorage.setItem('user', JSON.stringify({ ...user, ...u })); // Opcional, según tu auth
     };
 
     const toggleWidget = (key) => {
@@ -107,6 +204,7 @@ export default function Home() {
         setVisibleWidgets(newState);
         localStorage.setItem('home_widgets_config', JSON.stringify(newState));
     };
+
     const handleDragEnd = (event) => {
         const { active, over } = event;
         if (active.id !== over.id) {
@@ -120,14 +218,11 @@ export default function Home() {
         }
     };
 
-    // Al actualizar un widget, también refrescamos los datos locales para que se vea al instante
     const handleUpdateWidget = async (type, value) => {
         try {
             const res = await api.put('/daily', { type, value });
-            // Actualizamos solo el campo que cambió en dailyData
             setDailyData(prev => ({ ...prev, [type]: res.data[type] }));
 
-            // Si el backend devuelve un user actualizado (ej: al ganar XP por dormir), actualizamos el usuario global
             if (res.data.user) {
                 setUser(prev => ({ ...prev, ...res.data.user }));
             }
@@ -140,11 +235,36 @@ export default function Home() {
 
         switch (key) {
             case 'missions':
-                const hasMissions = dailyData.missionStats?.completed > 0;
-                if (!hasMissions) return <Link to="/missions" className="block h-full"><MissionsWidget stats={dailyData.missionStats} /></Link>;
+                const stats = dailyData.missionStats || { completed: 0, total: 0, listCompleted: [] };
+                const dailyGoal = stats.total || 0;
+                let dailyCompletedCount = stats.listCompleted
+                    ? stats.listCompleted.filter(m => !m.type || m.type === 'daily').length
+                    : 0;
+
+                if (dailyCompletedCount === 0 && stats.completed > 0) {
+                    dailyCompletedCount = stats.completed;
+                }
+
+                const showWidget = dailyGoal > 0 || dailyCompletedCount > 0;
+
+                if (!showWidget) {
+                    return (
+                        <Link to="/missions" className="block h-full">
+                            <MissionsWidget completed={0} total={0} />
+                        </Link>
+                    );
+                }
+
                 return (
-                    <div onClick={() => setSelectedMissions(dailyData.missionStats)} className="cursor-pointer transition-all active:scale-[0.99] h-full">
-                        <MissionsWidget stats={dailyData.missionStats} />
+                    <div
+                        onClick={() => setSelectedMissions(stats)}
+                        className="cursor-pointer transition-all active:scale-[0.99] h-full"
+                    >
+                        <MissionsWidget
+                            completed={dailyCompletedCount}
+                            total={dailyGoal}
+                            list={stats.listCompleted}
+                        />
                     </div>
                 );
 
@@ -153,17 +273,24 @@ export default function Home() {
                 return <div onClick={() => setSelectedSport(dailyData.sportWorkout)} className="cursor-pointer transition-all active:scale-[0.98] h-full"><SportWidget workout={dailyData.sportWorkout} /></div>;
 
             case 'training':
-                if (!dailyData.gymWorkout) return <Link to="/gym" className="block h-full"><TrainingWidget workout={null} /></Link>;
+                const gymData = dailyData.gymWorkout;
+                // Solo mostramos completado si hay ejercicios registrados
+                const hasWorkout = gymData && gymData.exercises && gymData.exercises.length > 0;
+
+                if (!hasWorkout) {
+                    return <Link to="/gym" className="block h-full"><TrainingWidget workout={null} /></Link>;
+                }
+
                 return (
-                    <div onClick={() => setSelectedTraining(dailyData.gymWorkout)} className="cursor-pointer transition-all active:scale-[0.99] h-full">
-                        <TrainingWidget workout={dailyData.gymWorkout} />
+                    <div onClick={() => setSelectedTraining(gymData)} className="cursor-pointer transition-all active:scale-[0.99] h-full">
+                        <TrainingWidget workout={gymData} />
                     </div>
                 );
 
             case 'food':
                 const currentKcal = dailyData.totalKcal || dailyData.nutrition?.totalKcal || 0;
-                const limitKcal = user?.calorieGoal || 2100;
-                const foodData = dailyData.nutrition || { totalKcal: currentKcal, breakfast: 0, lunch: 0, dinner: 0, snacks: 0 };
+                const limitKcal = user?.macros?.calories || user?.calorieGoal || 2100;
+                const foodData = dailyData.nutrition || { totalKcal: currentKcal, breakfast: 0, lunch: 0, dinner: 0, snacks: 0, merienda: 0 };
 
                 if (currentKcal === 0) {
                     return <Link to="/food" className="block h-full cursor-pointer hover:opacity-90 active:scale-95 transition-all"><FoodWidget currentKcal={0} limitKcal={limitKcal} /></Link>;
@@ -174,8 +301,24 @@ export default function Home() {
             case 'steps': return <StepsWidget steps={dailyData.steps} onUpdate={(val) => handleUpdateWidget('steps', val)} />;
             case 'mood': return <MoodWidget mood={dailyData.mood} onUpdate={(val) => handleUpdateWidget('mood', val)} />;
             case 'weight': return <div className="h-full flex flex-col"><WeightWidget initialWeight={dailyData.weight} onUpdate={(val) => handleUpdateWidget('weight', val)} /></div>;
-            case 'streak': return <StreakWidget streak={dailyData.streakCurrent || 1} />;
-            case 'gains': return <GainsWidget dailyCoins={dailyData.gains?.coins || 0} dailyXP={dailyData.gains?.xp || 0} dailyLives={dailyData.gains?.lives || 0} />;
+
+            case 'streak':
+                const currentStreak = user?.streak?.current || 1;
+                return <StreakWidget streak={currentStreak} />;
+
+            case 'gains':
+                return (
+                    <Link to="/shop" className="block h-full cursor-pointer hover:opacity-95 transition-all active:scale-95">
+                        <GainsWidget
+                            totalCoins={user?.coins || 0}
+                            currentXP={user?.currentXP || 0}
+                            nextLevelXP={user?.nextLevelXP || 100}
+                            level={user?.level || 1}
+                            lives={user?.lives || 0}
+                        />
+                    </Link>
+                );
+
             default: return null;
         }
     };
@@ -188,7 +331,13 @@ export default function Home() {
 
     return (
         <div className="space-y-6 pb-6 animate-in fade-in select-none">
-            {showRewardModal && <DailyRewardModal user={user} onClose={() => setShowRewardModal(false)} onUpdateUser={handleUserUpdate} />}
+
+            {showRewardModal && (
+                <DailyRewardModal
+                    data={rewardData}
+                    onClose={() => setShowRewardModal(false)}
+                />
+            )}
 
             <div className="flex justify-between items-center">
                 <div>
@@ -197,7 +346,21 @@ export default function Home() {
                     </h1>
                     <p className="text-xs text-gray-500">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
                 </div>
-                <button onClick={() => setShowSettings(true)} className="bg-gray-900 border border-gray-800 p-2 rounded-xl text-gray-400 hover:text-white transition-all active:scale-95"><Settings size={20} /></button>
+
+                <div className="flex items-center gap-2">
+                    {/* BOTÓN REGALO */}
+                    <button
+                        onClick={handleManualClick}
+                        className={`p-2 rounded-xl transition-all active:scale-95 border ${hasClaimedToday() ? 'bg-gray-800 border-gray-700 text-gray-500' : 'bg-yellow-900/20 border-yellow-500/30 text-yellow-400 hover:text-white hover:bg-yellow-600'}`}
+                    >
+                        <Gift size={20} />
+                    </button>
+
+                    {/* BOTÓN SETTINGS */}
+                    <button onClick={() => setShowSettings(true)} className="bg-gray-900 border border-gray-800 p-2 rounded-xl text-gray-400 hover:text-white transition-all active:scale-95">
+                        <Settings size={20} />
+                    </button>
+                </div>
             </div>
 
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -229,7 +392,63 @@ export default function Home() {
                 </div>
             )}
 
-            {/* MODAL DEPORTE */}
+            {/* MODAL MISIONES */}
+            {selectedMissions && (
+                <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative animate-in zoom-in-95">
+                        <button onClick={() => setSelectedMissions(null)} className="absolute top-4 right-4 bg-gray-800/50 p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"><X size={20} /></button>
+
+                        <div className="flex items-center gap-2 text-yellow-500 font-bold text-sm tracking-wider uppercase mb-1">
+                            <Trophy size={18} /> MISIONES
+                        </div>
+                        <h2 className="text-3xl font-black text-white capitalize mb-4">Completadas</h2>
+
+                        <div className="space-y-3">
+                            {selectedMissions.listCompleted && selectedMissions.listCompleted.length > 0 ? (
+                                selectedMissions.listCompleted.map((m, idx) => (
+                                    <div key={idx} className="bg-black/40 p-4 rounded-xl border border-gray-800/50 flex flex-col gap-2">
+                                        <div className="flex justify-between items-start">
+                                            <span className="text-white text-sm font-bold block">{m.title}</span>
+                                            <CheckCircle size={16} className="text-green-500" />
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${m.frequency === 'daily' ? 'bg-blue-900/30 text-blue-300 border-blue-500/30' :
+                                                    m.frequency === 'weekly' ? 'bg-purple-900/30 text-purple-300 border-purple-500/30' :
+                                                        'bg-gray-800 text-gray-400 border-gray-700'
+                                                }`}>
+                                                {m.frequency === 'daily' ? 'Diaria' : m.frequency === 'weekly' ? 'Semanal' : m.frequency || 'Misión'}
+                                            </span>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${m.type === 'habit' ? 'bg-green-900/30 text-green-300 border-green-500/30' :
+                                                    'bg-orange-900/30 text-orange-300 border-orange-500/30'
+                                                }`}>
+                                                {m.type === 'habit' ? 'Hábito' : 'Tarea'}
+                                            </span>
+                                        </div>
+                                        <div className="flex gap-3 mt-1 pt-2 border-t border-gray-800">
+                                            {m.xpReward > 0 && (
+                                                <span className="flex items-center gap-1 text-xs text-blue-400 font-bold">
+                                                    <Zap size={12} /> +{m.xpReward} XP
+                                                </span>
+                                            )}
+                                            {m.coinReward > 0 && (
+                                                <span className="flex items-center gap-1 text-xs text-yellow-400 font-bold">
+                                                    <Coins size={12} /> +{m.coinReward}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-8 text-gray-500 bg-gray-950 rounded-xl border border-gray-800">
+                                    <p>No hay misiones completadas.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL SPORT */}
             {selectedSport && (
                 <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
                     <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative animate-in zoom-in-95">
@@ -246,7 +465,7 @@ export default function Home() {
                 </div>
             )}
 
-            {/* MODAL COMIDA */}
+            {/* MODAL FOOD */}
             {selectedFood && (
                 <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
                     <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative animate-in zoom-in-95">
@@ -255,34 +474,12 @@ export default function Home() {
                         <h2 className="text-3xl font-black text-white mb-1">{selectedFood.totalKcal} <span className="text-lg text-gray-500 font-bold">kcal</span></h2>
                         <div className="space-y-3 mt-4">
                             <div className="bg-gray-950 p-3 rounded-xl border border-gray-800 flex justify-between"><span className="text-gray-400 text-xs font-bold uppercase">Desayuno</span><span className="text-white font-bold">{selectedFood.breakfast || 0} kcal</span></div>
-                            <div className="bg-gray-950 p-3 rounded-xl border border-gray-800 flex justify-between"><span className="text-gray-400 text-xs font-bold uppercase">Comida</span><span className="text-white font-bold">{selectedFood.lunch || 0} kcal</span></div>
-                            <div className="bg-gray-950 p-3 rounded-xl border border-gray-800 flex justify-between"><span className="text-gray-400 text-xs font-bold uppercase">Cena</span><span className="text-white font-bold">{selectedFood.dinner || 0} kcal</span></div>
                             <div className="bg-gray-950 p-3 rounded-xl border border-gray-800 flex justify-between"><span className="text-gray-400 text-xs font-bold uppercase">Snacks</span><span className="text-white font-bold">{selectedFood.snacks || 0} kcal</span></div>
+                            <div className="bg-gray-950 p-3 rounded-xl border border-gray-800 flex justify-between"><span className="text-gray-400 text-xs font-bold uppercase">Comida</span><span className="text-white font-bold">{selectedFood.lunch || 0} kcal</span></div>
+                            <div className="bg-gray-950 p-3 rounded-xl border border-gray-800 flex justify-between"><span className="text-gray-400 text-xs font-bold uppercase">Merienda</span><span className="text-white font-bold">{selectedFood.merienda || 0} kcal</span></div>
+                            <div className="bg-gray-950 p-3 rounded-xl border border-gray-800 flex justify-between"><span className="text-gray-400 text-xs font-bold uppercase">Cena</span><span className="text-white font-bold">{selectedFood.dinner || 0} kcal</span></div>
                         </div>
                         <div className="mt-6"><Link to="/food" className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl text-center transition-all">Editar Registro</Link></div>
-                    </div>
-                </div>
-            )}
-
-            {/* MODAL MISIONES */}
-            {selectedMissions && (
-                <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative animate-in zoom-in-95">
-                        <button onClick={() => setSelectedMissions(null)} className="absolute top-4 right-4 bg-gray-800/50 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
-                        <div className="flex items-center gap-2 text-yellow-500 font-bold text-sm tracking-wider uppercase mb-1"><Trophy size={18} /> MISIONES</div>
-                        <h2 className="text-3xl font-black text-white capitalize mb-4">Completadas</h2>
-                        <div className="space-y-3">
-                            {selectedMissions.listCompleted && selectedMissions.listCompleted.length > 0 ? (
-                                selectedMissions.listCompleted.map((m, idx) => (
-                                    <div key={idx} className="bg-black/40 p-4 rounded-xl border border-gray-800/50 flex justify-between items-center">
-                                        <span className="text-white text-sm font-bold">{m.title}</span>
-                                        {m.coinReward > 0 && <span className="text-xs text-yellow-400 bg-yellow-900/20 px-2 py-1 rounded border border-yellow-500/20 font-bold">+{m.coinReward} 💰</span>}
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-8 text-gray-500 bg-gray-950 rounded-xl border border-gray-800"><p>No hay misiones completadas.</p></div>
-                            )}
-                        </div>
                     </div>
                 </div>
             )}
@@ -290,27 +487,54 @@ export default function Home() {
             {/* MODAL RUTINA (GYM) */}
             {selectedTraining && (
                 <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative animate-in zoom-in-95">
-                        <button onClick={() => setSelectedTraining(null)} className="absolute top-4 right-4 bg-gray-800/50 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
-                        <div className="flex items-center gap-2 text-blue-500 font-bold text-sm tracking-wider uppercase mb-1"><Dumbbell size={18} /> GIMNASIO</div>
-                        <h2 className="text-3xl font-black text-white capitalize mb-4">Detalle Rutina</h2>
-                        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                    <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative animate-in zoom-in-95 flex flex-col max-h-[85vh]">
+
+                        <div className="flex justify-between items-start mb-4 shrink-0">
+                            <div>
+                                <div className="flex items-center gap-2 text-blue-500 font-bold text-sm tracking-wider uppercase mb-1">
+                                    <Dumbbell size={18} /> GIMNASIO
+                                </div>
+                                <h2 className="text-2xl font-black text-white capitalize leading-tight">
+                                    {selectedTraining.name || selectedTraining.routineName}
+                                </h2>
+                                <div className="flex gap-3 mt-2 text-xs font-bold text-gray-400">
+                                    <span className="flex items-center gap-1 bg-gray-800 px-2 py-1 rounded">
+                                        <Clock size={12} /> {Math.floor((selectedTraining.duration || 0) / 60)} min
+                                    </span>
+                                    <span className="flex items-center gap-1 bg-gray-800 px-2 py-1 rounded">
+                                        <BarChart3 size={12} />
+                                        {selectedTraining.exercises?.reduce((total, ex) =>
+                                            total + ex.sets.reduce((sTotal, s) => sTotal + (s.weight * s.reps), 0), 0
+                                        ).toLocaleString()} kg Vol.
+                                    </span>
+                                </div>
+                            </div>
+                            <button onClick={() => setSelectedTraining(null)} className="bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
+                        </div>
+
+                        <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1">
                             {selectedTraining.exercises.map((ex, idx) => (
-                                <div key={idx} className="bg-black/40 p-3 rounded-xl border border-gray-800/50">
-                                    <div className="flex justify-between items-center mb-2">
+                                <div key={idx} className="bg-gray-950/50 p-3 rounded-xl border border-gray-800/50">
+                                    <div className="flex justify-between items-center mb-2 border-b border-gray-800 pb-2">
                                         <span className="text-white font-bold text-sm truncate">{ex.name}</span>
-                                        <span className="text-gray-500 text-[9px] font-bold uppercase bg-gray-800 px-2 py-0.5 rounded">{ex.sets.length} Series</span>
+                                        <span className="text-gray-500 text-[9px] font-bold uppercase bg-gray-900 px-2 py-0.5 rounded border border-gray-800">
+                                            {ex.sets.length} Series
+                                        </span>
                                     </div>
-                                    <div className="flex flex-wrap gap-2">
+                                    <div className="grid grid-cols-4 gap-2">
                                         {ex.sets.map((set, sIdx) => (
-                                            <div key={sIdx} className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-center min-w-[45px]">
-                                                <div className="text-blue-400 font-bold text-xs">{set.weight}<span className="text-[8px] text-gray-500">kg</span></div>
-                                                <div className="text-gray-500 text-[8px]">{set.reps} reps</div>
+                                            <div key={sIdx} className="bg-gray-900 border border-gray-800 rounded px-1 py-1 text-center flex flex-col justify-center">
+                                                <div className="text-blue-400 font-bold text-xs">{set.weight}<span className="text-[8px] text-gray-600">kg</span></div>
+                                                <div className="text-gray-500 text-[9px]">{set.reps} reps</div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             ))}
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-gray-800 text-center">
+                            <Link to="/gym" className="text-xs text-blue-500 font-bold hover:underline">VER HISTORIAL COMPLETO</Link>
                         </div>
                     </div>
                 </div>

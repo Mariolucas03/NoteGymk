@@ -23,16 +23,22 @@ const userSchema = new mongoose.Schema({
     level: { type: Number, default: 1 },
     currentXP: { type: Number, default: 0 },
     nextLevelXP: { type: Number, default: 100 },
-    coins: { type: Number, default: 0 },
-
-    // --- AQUÍ ESTABA EL ERROR ---
-    // Borra "max: null". Déjalo solo así:
+    coins: { type: Number, default: 50 },
     lives: { type: Number, default: 100 },
 
     inventory: [{
         item: { type: mongoose.Schema.Types.ObjectId, ref: 'ShopItem' },
         quantity: { type: Number, default: 1 }
     }],
+
+    // --- CONFIGURACIÓN DE OBJETIVOS (NUEVO) ---
+    macros: {
+        calories: { type: Number, default: 2100 },
+        protein: { type: Number, default: 150 },
+        carbs: { type: Number, default: 200 },
+        fat: { type: Number, default: 70 },
+        fiber: { type: Number, default: 30 }
+    },
 
     // --- WIDGETS ---
     streak: {

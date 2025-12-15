@@ -1,65 +1,57 @@
-import { Coins, Zap, Heart, TrendingUp } from 'lucide-react';
+import React from 'react';
+import { Trophy, Heart, Zap, Coins } from 'lucide-react';
 
-export default function GainsWidget({ dailyCoins = 0, dailyXP = 0, dailyLives = 0 }) {
+// Ahora recibe las props GLOBALES del usuario
+export default function GainsWidget({ totalCoins = 0, currentXP = 0, nextLevelXP = 100, level = 1, lives = 0 }) {
+
+    // Cálculo seguro del porcentaje de la barra (0% a 100%)
+    const progress = Math.min(100, Math.max(0, (currentXP / nextLevelXP) * 100));
+
     return (
-        <div className="bg-gray-900 border border-yellow-500/30 rounded-2xl p-4 h-40 relative overflow-hidden flex flex-col justify-between shadow-lg group">
+        <div className="bg-gradient-to-br from-gray-900 via-gray-900 to-black p-5 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden h-full flex flex-col justify-between group">
 
-            {/* Header */}
-            <div className="flex justify-between items-start z-10">
-                <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-yellow-400 transition-colors">
-                    <TrendingUp size={12} /> Ganancias Hoy
-                </h3>
-                <div className="bg-yellow-500/10 p-1 rounded-md">
-                    <Coins size={14} className="text-yellow-500" />
+            {/* Fondo decorativo (Glow) */}
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-600/10 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-600/20 transition-all duration-500"></div>
+
+            {/* --- CABECERA SUPERIOR --- */}
+            <div className="flex justify-between items-start mb-2 relative z-10">
+                <div className="flex flex-col">
+                    <div className="flex items-center gap-1.5 mb-1">
+                        <Trophy size={12} className="text-yellow-500" />
+                        <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Nivel {level}</span>
+                    </div>
+
+                    {/* Saldo de Monedas */}
+                    <div className="text-white font-black text-3xl flex items-center gap-2 drop-shadow-md">
+                        {totalCoins.toLocaleString()}
+                        <Coins size={20} className="text-yellow-400 fill-yellow-400/20" />
+                    </div>
+                </div>
+
+                {/* Contador de Vidas */}
+                <div className="flex items-center gap-1.5 bg-red-950/30 px-2.5 py-1.5 rounded-xl border border-red-500/20 shadow-inner backdrop-blur-sm">
+                    <Heart size={16} className="text-red-500 fill-red-500 animate-pulse" />
+                    <span className="text-red-100 font-bold text-base">{lives}</span>
                 </div>
             </div>
 
-            {/* Lista de Ganancias */}
-            <div className="space-y-3 z-10 mt-2">
-
-                {/* Monedas */}
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <div className="bg-yellow-500/20 p-1 rounded-full">
-                            <Coins size={12} className="text-yellow-500" />
-                        </div>
-                        <span className="text-xs text-gray-400 font-bold">Monedas</span>
-                    </div>
-                    <span className={`text-sm font-bold ${dailyCoins > 0 ? 'text-yellow-400' : 'text-gray-600'}`}>
-                        +{dailyCoins}
-                    </span>
+            {/* --- BARRA DE EXPERIENCIA --- */}
+            <div className="mt-auto relative z-10">
+                <div className="flex justify-between text-[10px] text-gray-400 font-bold mb-1.5 uppercase tracking-wider">
+                    <span className="flex items-center gap-1"><Zap size={10} className="text-blue-400" /> XP Actual</span>
+                    <span>{currentXP} <span className="text-gray-600">/</span> {nextLevelXP}</span>
                 </div>
 
-                {/* XP */}
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <div className="bg-blue-500/20 p-1 rounded-full">
-                            <Zap size={12} className="text-blue-500" />
-                        </div>
-                        <span className="text-xs text-gray-400 font-bold">XP</span>
+                <div className="w-full h-2.5 bg-gray-800 rounded-full overflow-hidden border border-gray-700/50 shadow-inner">
+                    <div
+                        className="h-full bg-gradient-to-r from-blue-600 to-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)] relative transition-all duration-700 ease-out"
+                        style={{ width: `${progress}%` }}
+                    >
+                        {/* Brillo en la punta de la barra */}
+                        <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/50 blur-[1px]"></div>
                     </div>
-                    <span className={`text-sm font-bold ${dailyXP > 0 ? 'text-blue-400' : 'text-gray-600'}`}>
-                        +{dailyXP}
-                    </span>
                 </div>
-
-                {/* Vidas (Opcional, si no se ganan vidas a diario se queda en gris) */}
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <div className="bg-red-500/20 p-1 rounded-full">
-                            <Heart size={12} className="text-red-500" />
-                        </div>
-                        <span className="text-xs text-gray-400 font-bold">Vidas</span>
-                    </div>
-                    <span className={`text-sm font-bold ${dailyLives > 0 ? 'text-red-400' : 'text-gray-600'}`}>
-                        +{dailyLives}
-                    </span>
-                </div>
-
             </div>
-
-            {/* Fondo Decorativo */}
-            <div className="absolute -right-6 -top-6 w-24 h-24 bg-yellow-500/5 rounded-full blur-2xl group-hover:bg-yellow-500/10 transition-all pointer-events-none" />
         </div>
     );
 }

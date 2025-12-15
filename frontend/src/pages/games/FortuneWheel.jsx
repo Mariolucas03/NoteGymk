@@ -143,10 +143,9 @@ function ActiveWheel({ config, mode, user, setUser }) {
     const [rotation, setRotation] = useState(0);
     const [canDailySpin, setCanDailySpin] = useState(true);
     const [timeLeft, setTimeLeft] = useState('');
-
-    // Estado para el mensaje de premio
     const [winData, setWinData] = useState(null);
 
+    // Verificación de fecha (Igual que tenías)
     useEffect(() => {
         if (mode === 'daily') {
             checkDaily();
@@ -155,10 +154,10 @@ function ActiveWheel({ config, mode, user, setUser }) {
         } else {
             setCanDailySpin(true);
         }
-    }, [mode, user.last_daily_spin]);
+    }, [mode, user?.last_daily_spin]); // Añadido user?. para seguridad
 
     const checkDaily = () => {
-        if (!user.last_daily_spin) { setCanDailySpin(true); return; }
+        if (!user || !user.last_daily_spin) { setCanDailySpin(true); return; }
         const last = new Date(user.last_daily_spin);
         const today = new Date();
         const sameDay = last.getDate() === today.getDate() && last.getMonth() === today.getMonth() && last.getFullYear() === today.getFullYear();
@@ -177,6 +176,7 @@ function ActiveWheel({ config, mode, user, setUser }) {
 
     const handleSpin = async () => {
         if (spinning) return;
+        if (!user) return; // Seguridad extra
         if (mode === 'daily' && !canDailySpin) return;
         if (mode !== 'daily' && user.coins < config.cost) return;
 
@@ -184,25 +184,19 @@ function ActiveWheel({ config, mode, user, setUser }) {
         setWinData(null);
 
         // ---------------------------------------------------------
-        // 1. COBRAR ENTRADA (BASE DE DATOS Y VISUAL)
+        // 1. COBRAR ENTRADA
         // ---------------------------------------------------------
-        // Calculamos saldo restante
+        // Calcular nuevo saldo localmente
         const balanceAfterCost = user.coins - config.cost;
 
-        // Actualizamos visualmente
-        setUser(prev => ({ ...prev, coins: balanceAfterCost }));
+        // ✅ CORRECCIÓN CRÍTICA: Actualizamos Layout con OBJETO, no función
+        setUser({ coins: balanceAfterCost });
 
-        // Actualizamos en la BASE DE DATOS inmediatamente el cobro
-        // Usamos PUT al usuario para fijar el saldo nuevo y evitar que recupere el dinero al recargar
+        // API: Usamos /reward en negativo (Método seguro estandarizado)
         if (config.cost > 0) {
-            try {
-                // Usamos el ID del usuario. Asegúrate de si es _id o id en tu sistema.
-                const userId = user._id || user.id;
-                await api.put(`/users/${userId}`, { coins: balanceAfterCost });
-            } catch (error) {
-                console.error("Error cobrando entrada en DB:", error);
-                // Si falla el cobro, en un sistema real pararíamos, pero aquí seguimos por fluidez
-            }
+            api.post('/users/reward', { coins: -config.cost }).catch(err => {
+                console.error("Error cobrando entrada:", err);
+            });
         }
 
         // ---------------------------------------------------------
@@ -224,7 +218,6 @@ function ActiveWheel({ config, mode, user, setUser }) {
             setSpinning(false);
             if (mode === 'daily') setCanDailySpin(false);
 
-            // Pop-up visual
             setWinData(prize);
 
             if (prize.value > 0) {
@@ -235,23 +228,25 @@ function ActiveWheel({ config, mode, user, setUser }) {
             const finalCoins = balanceAfterCost + prize.value;
             const now = new Date().toISOString();
 
-            // Actualización Visual
-            setUser(prev => ({
-                ...prev,
-                coins: finalCoins,
-                ...(mode === 'daily' && { last_daily_spin: now })
-            }));
+            // ✅ CORRECCIÓN CRÍTICA: Actualizamos Layout con OBJETO y FECHA si aplica
+            const updatePayload = {
+                coins: finalCoins
+            };
+            if (mode === 'daily') {
+                updatePayload.last_daily_spin = now;
+            }
+
+            setUser(updatePayload); // Enviamos todo junto al Layout
 
             // GUARDAR PREMIO EN BASE DE DATOS
             try {
                 if (prize.value > 0) {
-                    // Usamos /reward igual que en DiceGame para sumar el premio
-                    const { data } = await api.post('/users/reward', { coins: prize.value });
-                    // Sincronizamos con la respuesta del servidor por seguridad
-                    setUser(prev => ({ ...prev, coins: data.user.coins }));
+                    await api.post('/users/reward', { coins: prize.value });
                 }
 
                 // Si es diaria, guardamos también la FECHA
+                // Nota: Usamos PUT solo para la fecha si es necesario, o confiamos en que /reward pueda manejarlo si actualizas tu backend.
+                // Por ahora mantenemos el PUT solo para la fecha para asegurar persistencia del "bloqueo diario".
                 if (mode === 'daily') {
                     const userId = user._id || user.id;
                     await api.put(`/users/${userId}`, { last_daily_spin: now });
@@ -265,7 +260,7 @@ function ActiveWheel({ config, mode, user, setUser }) {
     };
 
     const isLocked = mode === 'daily' && !canDailySpin;
-    const canAfford = user.coins >= config.cost;
+    const canAfford = user ? user.coins >= config.cost : false;
 
     return (
         <div className="flex flex-col items-center justify-between h-full w-full py-4 relative">
@@ -322,10 +317,10 @@ function ActiveWheel({ config, mode, user, setUser }) {
                 ) : (
                     <button
                         onClick={handleSpin}
-                        disabled={spinning || !canAfford}
+                        disabled={spinning || (!canAfford && mode !== 'daily')}
                         className={`
                             w-full py-4 rounded-2xl font-black text-xl shadow-xl transition-transform active:scale-95
-                            ${spinning || !canAfford
+                            ${spinning || (!canAfford && mode !== 'daily')
                                 ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
                                 : `bg-gradient-to-r ${config.color} text-white hover:scale-105`
                             }
@@ -334,7 +329,7 @@ function ActiveWheel({ config, mode, user, setUser }) {
                         {spinning ? 'GIRANDO...' : config.cost === 0 ? '¡GIRAR GRATIS!' : `GIRAR (${config.cost})`}
                     </button>
                 )}
-                {!canAfford && !spinning && !isLocked && (
+                {!canAfford && mode !== 'daily' && !spinning && !isLocked && (
                     <p className="text-center text-xs text-red-400 font-bold mt-2">Saldo insuficiente</p>
                 )}
             </div>

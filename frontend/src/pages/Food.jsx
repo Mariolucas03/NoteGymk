@@ -1,30 +1,40 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Flame, Droplet, Wheat, LayoutGrid, Leaf, Settings, X, Save, Bot, User, Send, ChevronRight } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom'; // <--- Importar Contexto
+import { Plus, Flame, Droplet, Wheat, LayoutGrid, Leaf, Settings, X, Save, Bot, Send, ChevronRight } from 'lucide-react';
 import api from '../services/api';
 import FoodSearchModal from '../components/food/FoodSearchModal';
 import Toast from '../components/common/Toast';
 
 export default function Food() {
+    // ✅ OBTENEMOS EL USUARIO GLOBAL
+    const { user, setUser } = useOutletContext();
+
     const [log, setLog] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showSearch, setShowSearch] = useState(false);
     const [activeMealId, setActiveMealId] = useState(null);
     const [toast, setToast] = useState(null);
 
-    // Estado Modal Configuración (Manual o IA)
     const [configModal, setConfigModal] = useState({ show: false, mode: 'manual' });
 
-    // Estado Chat IA
+    // Estado Objetivos (Prioridad: User DB > LocalStorage > Default)
+    const [goals, setGoals] = useState(() => {
+        if (user && user.macros) return user.macros;
+        const saved = localStorage.getItem('user_goals');
+        return saved ? JSON.parse(saved) : { calories: 2100, protein: 158, carbs: 210, fat: 70, fiber: 29 };
+    });
+
+    // Sincronizar goals si el usuario cambia (ej: carga inicial)
+    useEffect(() => {
+        if (user && user.macros) {
+            setGoals(user.macros);
+        }
+    }, [user]);
+
     const [chatHistory, setChatHistory] = useState([]);
     const [chatInput, setChatInput] = useState('');
     const [chatLoading, setChatLoading] = useState(false);
     const chatEndRef = useRef(null);
-
-    // Estado Objetivos (Goals)
-    const [goals, setGoals] = useState(() => {
-        const saved = localStorage.getItem('user_goals');
-        return saved ? JSON.parse(saved) : { calories: 2100, protein: 158, carbs: 210, fat: 70, fiber: 29 };
-    });
 
     // Input Manual
     const [manualCalories, setManualCalories] = useState(goals.calories);
@@ -46,33 +56,51 @@ export default function Food() {
 
     const showToast = (message, type = 'success') => setToast({ message, type });
 
+    // --- ACTUALIZAR MACROS EN BD Y CONTEXTO ---
+    const updateGoals = async (newGoals) => {
+        try {
+            // 1. Guardar en Backend
+            const res = await api.put('/users/macros', newGoals);
+
+            // 2. Actualizar estado local
+            setGoals(newGoals);
+
+            // 3. Actualizar Usuario Global (Esto arregla el Home Widget)
+            setUser(res.data);
+
+            // 4. Backup LocalStorage
+            localStorage.setItem('user_goals', JSON.stringify(newGoals));
+
+            return true;
+        } catch (error) {
+            console.error(error);
+            showToast("Error guardando objetivos", "error");
+            return false;
+        }
+    };
+
     // --- LOGICA CHAT IA ---
     const handleSendChat = async () => {
         if (!chatInput.trim()) return;
-
         const userMsg = { role: 'user', content: chatInput };
         const newHistory = [...chatHistory, userMsg];
 
         setChatHistory(newHistory);
         setChatInput('');
         setChatLoading(true);
-
         try {
             const res = await api.post('/food/chat-macros', { history: newHistory });
-
             if (res.data.type === 'final') {
-                // IA terminó el cálculo
                 const { calories, protein, carbs, fat, fiber, message } = res.data.data;
-
                 const newGoals = { calories, protein, carbs, fat, fiber };
-                setGoals(newGoals);
-                localStorage.setItem('user_goals', JSON.stringify(newGoals));
+
+                // Guardar en DB
+                await updateGoals(newGoals);
 
                 setConfigModal({ show: false, mode: 'manual' });
                 showToast(message || "Objetivos actualizados por IA", "success");
                 setChatHistory([]);
             } else {
-                // IA hace otra pregunta
                 setChatHistory([...newHistory, { role: 'assistant', content: res.data.message }]);
             }
         } catch (error) {
@@ -82,7 +110,7 @@ export default function Food() {
         }
     };
 
-    const handleSaveManual = () => {
+    const handleSaveManual = async () => {
         const kcal = parseInt(manualCalories);
         if (isNaN(kcal) || kcal < 500) return showToast("Mínimo 500 kcal", "error");
 
@@ -94,10 +122,12 @@ export default function Food() {
             fiber: Math.round((kcal / 1000) * 14)
         };
 
-        setGoals(newGoals);
-        localStorage.setItem('user_goals', JSON.stringify(newGoals));
-        setConfigModal({ show: false, mode: 'manual' });
-        showToast(`Límite actualizado: ${kcal} Kcal`);
+        // Guardar en DB
+        const success = await updateGoals(newGoals);
+        if (success) {
+            setConfigModal({ show: false, mode: 'manual' });
+            showToast(`Límite actualizado: ${kcal} Kcal`);
+        }
     };
 
     const handleCreateCategory = async () => {

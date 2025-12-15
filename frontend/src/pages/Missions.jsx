@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Trash2, Plus, Zap, HeartCrack, Repeat, X, Trophy, ChevronLeft, ChevronRight, Check, Coins, Star, CalendarClock } from 'lucide-react';
+import { Trash2, Plus, Zap, Repeat, X, Trophy, ChevronLeft, ChevronRight, Check, Coins, Star, CalendarClock } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 
-// --- SUB-COMPONENTE: TARJETA DESLIZABLE (SWIPE CARD) ---
+// --- SUB-COMPONENTE: TARJETA ---
 function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
     const [dragX, setDragX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
-    const startX = useRef(0);
+    const startX = useRef(0); // useRef is used here
 
     const THRESHOLD = 100;
 
@@ -38,7 +38,7 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
         transform: `translateX(${dragX}px)`,
         transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
         cursor: isDragging ? 'grabbing' : 'grab',
-        willChange: 'transform'
+        touchAction: 'pan-y'
     };
 
     let bgClass = 'bg-gray-900';
@@ -47,28 +47,18 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
 
     if (dragX > 0) {
         bgClass = 'bg-green-600';
-        iconLeft = (
-            <div className="absolute left-6 flex items-center gap-2 font-bold text-white animate-in fade-in zoom-in duration-200">
-                <Check size={24} strokeWidth={3} /> Completar
-            </div>
-        );
+        iconLeft = <div className="absolute left-6 flex items-center gap-2 font-bold text-white"><Check size={24} /> Completar</div>;
     } else if (dragX < 0) {
         bgClass = 'bg-red-600';
-        iconRight = (
-            <div className="absolute right-6 flex items-center gap-2 font-bold text-white animate-in fade-in zoom-in duration-200">
-                Eliminar <Trash2 size={24} strokeWidth={3} />
-            </div>
-        );
+        iconRight = <div className="absolute right-6 flex items-center gap-2 font-bold text-white">Eliminar <Trash2 size={24} /></div>;
     }
 
     return (
-        <div className="relative w-full h-auto mb-3 select-none isolate">
-            {/* FONDO ACCIONES */}
-            <div className={`absolute inset-0 rounded-2xl flex items-center ${bgClass} overflow-hidden -z-10`}>
+        <div className="relative w-full h-auto mb-3 select-none isolate overflow-hidden rounded-2xl">
+            <div className={`absolute inset-0 flex items-center ${bgClass} -z-10`}>
                 {iconLeft} {iconRight}
             </div>
 
-            {/* TARJETA SUPERIOR */}
             <div
                 style={cardStyle}
                 onTouchStart={(e) => handleStart(e.targetTouches[0].clientX)}
@@ -82,34 +72,21 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
             >
                 <div>
                     <div className="flex justify-between items-start mb-2">
-                        {/* Título */}
                         <h3 className={`text-base font-bold transition-all ${mission.completed ? 'text-gray-500 line-through decoration-2' : 'text-white'}`}>
                             {mission.title}
                         </h3>
-
-                        {/* Etiqueta Tipo */}
-                        <div className={`
-                            text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide flex items-center gap-1
-                            ${mission.type === 'habit' ? 'bg-blue-900/40 text-blue-300 border border-blue-500/30' : 'bg-orange-900/40 text-orange-300 border border-orange-500/30'}
-                        `}>
+                        <div className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide flex items-center gap-1 ${mission.type === 'habit' ? 'bg-blue-900/40 text-blue-300 border border-blue-500/30' : 'bg-orange-900/40 text-orange-300 border border-orange-500/30'}`}>
                             {mission.type === 'habit' ? <Repeat size={10} /> : <Check size={10} />}
                             {mission.type === 'habit' ? 'HÁBITO' : 'TEMPORAL'}
                         </div>
                     </div>
 
-                    {/* Etiquetas extra */}
                     <div className="flex flex-wrap gap-2 mb-3">
                         <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded border ${getDifficultyColor(mission.difficulty)}`}>
                             {mission.difficulty}
                         </span>
-                        {mission.lifePenalty > 0 && (
-                            <span className="text-[10px] font-mono text-red-400 bg-red-900/20 px-2 py-1 rounded border border-red-900/30 flex items-center gap-1 font-bold">
-                                <HeartCrack size={10} /> -{mission.lifePenalty}
-                            </span>
-                        )}
                     </div>
 
-                    {/* Recompensas */}
                     <div className="flex gap-2">
                         <div className="flex items-center gap-1.5 bg-blue-600/10 px-2 py-1 rounded-lg border border-blue-500/20">
                             <Star size={12} className="text-blue-400 fill-blue-400" />
@@ -122,7 +99,6 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
                     </div>
                 </div>
 
-                {/* Barra de Progreso */}
                 {mission.target > 1 && (
                     <div className="mt-4 pointer-events-none">
                         <div className="flex justify-between text-[10px] text-gray-500 font-bold mb-1 uppercase tracking-wide">
@@ -134,7 +110,6 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
                     </div>
                 )}
 
-                {/* Flechas indicadoras de swipe */}
                 {!mission.completed && (
                     <div className="absolute right-4 bottom-4 text-gray-700 opacity-20">
                         <div className="flex"><ChevronLeft size={16} /><ChevronRight size={16} /></div>
@@ -145,11 +120,10 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
     );
 }
 
-// --- PÁGINA PRINCIPAL DE MISIONES ---
+// --- PÁGINA PRINCIPAL ---
 export default function Missions() {
-    // IMPORTANTE: Obtenemos user y setUser del contexto global
     const { user, setUser } = useOutletContext();
-
+    // ✅ 1. INICIALIZACIÓN SEGURA: Array vacío
     const [missions, setMissions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('daily');
@@ -157,11 +131,7 @@ export default function Missions() {
     const [toast, setToast] = useState(null);
 
     const [newMission, setNewMission] = useState({
-        title: '',
-        frequency: 'daily',
-        type: 'habit',
-        difficulty: 'easy',
-        target: 1
+        title: '', frequency: 'daily', type: 'habit', difficulty: 'easy', target: 1
     });
 
     useEffect(() => {
@@ -169,22 +139,28 @@ export default function Missions() {
         fetchMissions();
     }, [activeTab]);
 
-    // --- FUNCIÓN CLAVE: CARGAR Y SINCRONIZAR ---
     const fetchMissions = async () => {
         try {
             const res = await api.get('/missions');
-            setMissions(res.data.missions);
 
-            // CORRECCIÓN: Si el backend nos manda un usuario actualizado (y lo hará), 
-            // actualizamos el estado global para arreglar cualquier desincronización.
+            // ✅ 2. DOBLE SEGURIDAD: Verificar qué devuelve la API
+            let safeMissions = [];
+
+            if (Array.isArray(res.data)) {
+                safeMissions = res.data;
+            } else if (res.data && Array.isArray(res.data.missions)) {
+                safeMissions = res.data.missions;
+            }
+
+            setMissions(safeMissions);
+
             if (res.data.user && res.data.user.coins !== undefined) {
-                // Actualizamos el estado global de la App
                 setUser(res.data.user);
-                // Actualizamos el almacenamiento local para persistencia
                 localStorage.setItem('user', JSON.stringify(res.data.user));
             }
         } catch (error) {
-            console.error("Error cargando misiones:", error);
+            console.error("Error cargando:", error);
+            setMissions([]); // Fallback a vacío
         } finally {
             setLoading(false);
         }
@@ -197,15 +173,13 @@ export default function Missions() {
             const res = await api.put(`/missions/${mission._id}/complete`);
             const { xp, coins, user: updatedUser, synergyCount } = res.data;
 
-            fetchMissions(); // Recargamos la lista
+            fetchMissions();
 
-            // Si ganamos algo, actualizamos inmediatamente el usuario
             if (xp > 0 || coins > 0) {
                 if (updatedUser) {
                     setUser(updatedUser);
                     localStorage.setItem('user', JSON.stringify(updatedUser));
                 }
-
                 let msg = `+${xp} XP | +${coins} Monedas`;
                 if (synergyCount > 0) msg += ` (Combo x${synergyCount} 🔥)`;
                 showToast(msg);
@@ -216,7 +190,8 @@ export default function Missions() {
     const handleDelete = async (id) => {
         try {
             await api.delete(`/missions/${id}`);
-            setMissions(prev => prev.filter(m => m._id !== id));
+            // ✅ 3. ACTUALIZACIÓN SEGURA DE ESTADO
+            setMissions(prev => (prev || []).filter(m => m._id !== id));
             showToast("Misión eliminada", "info");
         } catch (error) { showToast("Error al borrar", "error"); }
     };
@@ -232,7 +207,8 @@ export default function Missions() {
         } catch (error) { showToast("Error creando misión", "error"); }
     };
 
-    const filteredMissions = missions.filter(m => m.frequency === activeTab);
+    // ✅ 4. FILTRADO SUPER SEGURO
+    const filteredMissions = (missions || []).filter(m => m && m.frequency === activeTab);
 
     const getDifficultyColor = (diff) => {
         switch (diff) {
@@ -247,10 +223,8 @@ export default function Missions() {
     const getExpirationDate = (freq) => {
         const now = new Date();
         let targetDate = new Date();
-
         switch (freq) {
-            case 'daily':
-                break;
+            case 'daily': break;
             case 'weekly':
                 const day = now.getDay();
                 const diff = day === 0 ? 0 : 7 - day;
@@ -262,18 +236,12 @@ export default function Missions() {
             case 'yearly':
                 targetDate = new Date(now.getFullYear(), 11, 31);
                 break;
-            default:
-                return '';
+            default: return '';
         }
-
         const dd = String(targetDate.getDate()).padStart(2, '0');
         const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
-        const yyyy = targetDate.getFullYear();
-
-        return `${dd}-${mm}-${yyyy}`;
+        return `${dd}-${mm}-${targetDate.getFullYear()}`;
     };
-
-    const expirationString = getExpirationDate(activeTab);
 
     return (
         <div className="pb-24 pt-4 px-4 min-h-screen animate-in fade-in select-none">
@@ -318,14 +286,12 @@ export default function Missions() {
                     ))
                 )}
 
-                {/* FECHA CADUCIDAD */}
                 <div className="mt-8 mb-4 flex items-center justify-center gap-2 text-gray-500 opacity-60">
                     <CalendarClock size={14} />
                     <span className="text-xs font-mono font-medium tracking-wider">
-                        CADUCA: {expirationString}
+                        CADUCA: {getExpirationDate(activeTab)}
                     </span>
                 </div>
-
                 <div className="h-20"></div>
             </div>
 

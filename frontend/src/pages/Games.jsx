@@ -1,5 +1,5 @@
 import { useOutletContext, Link } from 'react-router-dom';
-import { Gamepad2, Dices, CircleDollarSign, Ticket, ChevronLeft, Disc } from 'lucide-react';
+import { Gamepad2, Dices, CircleDollarSign, Ticket, ChevronLeft, Disc, Spade, Zap } from 'lucide-react';
 
 export default function Games() {
     // Obtenemos el usuario del contexto (Layout)
@@ -7,7 +7,7 @@ export default function Games() {
 
     const gamesList = [
         {
-            id: 'fortune-wheel', // Esto coincidirá con la ruta /games/fortune-wheel
+            id: 'fortune-wheel', // /games/fortune-wheel
             name: 'La Ruleta de la Suerte',
             desc: 'Gira y multiplica tus ganancias diarias.',
             icon: <CircleDollarSign size={40} className="text-yellow-400" />,
@@ -16,16 +16,34 @@ export default function Games() {
             status: 'Disponible'
         },
         {
-            id: 'roulette',
-            name: 'Ruleta',
+            id: 'slots', // /games/slots
+            name: 'Neon Slots',
+            desc: 'Alinea los símbolos y gana el Jackpot.',
+            icon: <Zap size={40} className="text-pink-400" />,
+            color: 'bg-pink-900/20 border-pink-500/30',
+            btnColor: 'bg-pink-600 hover:bg-pink-500',
+            status: 'Disponible'
+        },
+        {
+            id: 'blackjack', // /games/blackjack
+            name: 'Blackjack 21',
+            desc: 'Vence al crupier sumando 21.',
+            icon: <Spade size={40} className="text-green-400" />,
+            color: 'bg-green-900/20 border-green-500/30',
+            btnColor: 'bg-green-600 hover:bg-green-500',
+            status: 'Disponible'
+        },
+        {
+            id: 'roulette', // /games/roulette
+            name: 'Ruleta Casino',
             desc: 'Apuesta al rojo o negro clásico.',
             icon: <Disc size={40} className="text-red-400" />,
             color: 'bg-red-900/20 border-red-500/30',
             btnColor: 'bg-red-600 hover:bg-red-500',
-            status: 'Disponible' // Puedes ponerlo en 'Próximamente' si aún no tienes el archivo creado
+            status: 'Disponible'
         },
         {
-            id: 'dice',
+            id: 'dice', // /games/dice
             name: 'Dados Rápidos',
             desc: 'Saca mayor puntuación que la banca.',
             icon: <Dices size={40} className="text-blue-400" />,
@@ -34,7 +52,7 @@ export default function Games() {
             status: 'Disponible'
         },
         {
-            id: 'scratch',
+            id: 'scratch', // /games/scratch
             name: 'Rasca y Gana',
             desc: 'Encuentra 3 símbolos iguales.',
             icon: <Ticket size={40} className="text-purple-400" />,

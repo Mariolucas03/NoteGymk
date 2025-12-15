@@ -16,7 +16,8 @@ import FortuneWheel from './pages/games/FortuneWheel';
 import ScratchGame from './pages/games/ScratchGame';
 import DiceGame from './pages/games/DiceGame';
 import Roulette from './pages/games/Roulette';
-
+import BlackJack from './pages/games/BlackJack';
+import Slots from './pages/games/Slots';
 
 function App() {
     return (
@@ -40,6 +41,8 @@ function App() {
                     <Route path="/games/scratch" element={<ScratchGame />} />
                     <Route path="/games/dice" element={<DiceGame />} />
                     <Route path="/games/roulette" element={<Roulette />} />
+                    <Route path="/games/blackjack" element={<BlackJack />} />
+                    <Route path="/games/slots" element={<Slots />} />
                 </Route>
             </Routes>
         </Router>

@@ -1,31 +1,31 @@
-// Genera la configuración de cualquier día (1 al 365)
+// Calcula la recompensa para un día específico (1, 2, 5, 100...)
 export const getRewardForDay = (day) => {
-    let type = 'normal'; // normal, rare, epic
+    let type = 'normal';
     let coins = 50;
-    let xp = 25;
-    let lives = 0;
-    let label = 'Recompensa Diaria';
+    let xp = 20;
+    let icon = '💰';
 
-    // Cada 30 días (Mes): MEGA PREMIO
-    if (day % 30 === 0) {
-        type = 'epic';
-        coins = 500;
-        xp = 200;
-        lives = 1;
-        label = '¡Cofre Mensual!';
-    }
-    // Cada 7 días (Semana): PREMIO GRANDE
-    else if (day % 7 === 0) {
+    // Lógica: Cada día suma un poco más
+    // Día 7, 14, 21... (Semanal): Premio Raro
+    if (day % 7 === 0) {
         type = 'rare';
         coins = 150;
         xp = 100;
-        label = 'Bonus Semanal';
+        icon = '🎁';
     }
-    // Días normales: Incremento progresivo leve
+    // Día 30, 60... (Mensual): Premio Épico
+    else if (day % 30 === 0) {
+        type = 'epic';
+        coins = 500;
+        xp = 250;
+        icon = '👑';
+    }
+    // Días normales
     else {
-        // Un poco más cada día que pasa
-        coins += day;
+        // Un pequeño incremento cada día para motivar
+        coins += (day * 2);
+        xp += day;
     }
 
-    return { day, type, coins, xp, lives, label };
+    return { day, type, coins, xp, icon };
 };

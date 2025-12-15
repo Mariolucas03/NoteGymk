@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Trash2, Plus, Zap, HeartCrack, Repeat, Clock, X, Trophy, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { Trash2, Plus, Zap, HeartCrack, Repeat, X, Trophy, ChevronLeft, ChevronRight, Check, Coins, Star, CalendarClock } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 
@@ -10,17 +10,9 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
     const [isDragging, setIsDragging] = useState(false);
     const startX = useRef(0);
 
-    // Umbral para disparar la acción (píxeles)
     const THRESHOLD = 100;
 
-    // --- MANEJADORES DE TOQUE/RATÓN ---
     const handleStart = (clientX) => {
-        // Permitimos deslizar incluso si está completada para poder borrarla si queremos, 
-        // o bloqueamos completar si ya está hecha.
-        if (mission.completed) {
-            // Opcional: Si quieres que las completadas SOLO se puedan borrar (izquierda),
-            // podrías añadir lógica aquí. Por ahora dejamos libertad de movimiento.
-        }
         setIsDragging(true);
         startX.current = clientX;
     };
@@ -28,43 +20,32 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
     const handleMove = (clientX) => {
         if (!isDragging) return;
         const diff = clientX - startX.current;
-
-        // Limitamos un poco el movimiento si la misión está completada y se intenta completar de nuevo
         if (mission.completed && diff > 0) return;
-
         setDragX(diff);
     };
 
     const handleEnd = () => {
         setIsDragging(false);
-
         if (dragX > THRESHOLD) {
-            // Deslizaste a la DERECHA (Positivo) -> COMPLETAR
             if (!mission.completed) onComplete(mission);
         } else if (dragX < -THRESHOLD) {
-            // Deslizaste a la IZQUIERDA (Negativo) -> ELIMINAR
             onDelete(mission._id);
         }
-
-        // Reset posición (con animación suave)
         setDragX(0);
     };
 
-    // Estilos dinámicos para el movimiento
     const cardStyle = {
         transform: `translateX(${dragX}px)`,
-        transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)', // Efecto rebote suave
+        transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
         cursor: isDragging ? 'grabbing' : 'grab',
-        willChange: 'transform' // Optimización de rendimiento para evitar temblores
+        willChange: 'transform'
     };
 
-    // Lógica visual del fondo (Colores e Iconos)
-    let bgClass = 'bg-gray-900'; // Color base por si acaso
+    let bgClass = 'bg-gray-900';
     let iconLeft = null;
     let iconRight = null;
 
     if (dragX > 0) {
-        // Arrastrando a Derecha -> VERDE (Completar)
         bgClass = 'bg-green-600';
         iconLeft = (
             <div className="absolute left-6 flex items-center gap-2 font-bold text-white animate-in fade-in zoom-in duration-200">
@@ -72,7 +53,6 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
             </div>
         );
     } else if (dragX < 0) {
-        // Arrastrando a Izquierda -> ROJO (Eliminar)
         bgClass = 'bg-red-600';
         iconRight = (
             <div className="absolute right-6 flex items-center gap-2 font-bold text-white animate-in fade-in zoom-in duration-200">
@@ -83,64 +63,66 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
 
     return (
         <div className="relative w-full h-auto mb-3 select-none isolate">
-
-            {/* CAPA DE FONDO (ACCIONES) */}
+            {/* FONDO ACCIONES */}
             <div className={`absolute inset-0 rounded-2xl flex items-center ${bgClass} overflow-hidden -z-10`}>
-                {iconLeft}
-                {iconRight}
+                {iconLeft} {iconRight}
             </div>
 
-            {/* CAPA SUPERIOR (TARJETA) */}
+            {/* TARJETA SUPERIOR */}
             <div
                 style={cardStyle}
-                // Eventos Touch (Móvil)
                 onTouchStart={(e) => handleStart(e.targetTouches[0].clientX)}
                 onTouchMove={(e) => handleMove(e.targetTouches[0].clientX)}
                 onTouchEnd={handleEnd}
-                // Eventos Mouse (PC)
                 onMouseDown={(e) => handleStart(e.clientX)}
                 onMouseMove={(e) => handleMove(e.clientX)}
                 onMouseUp={handleEnd}
                 onMouseLeave={() => { if (isDragging) handleEnd() }}
-
-                className={`
-                    relative bg-gray-900 border border-gray-800 p-5 rounded-2xl shadow-md h-full flex flex-col justify-between
-                    ${mission.completed ? 'opacity-50 grayscale border-transparent' : 'hover:border-gray-700'}
-                `}
+                className={`relative bg-gray-900 border border-gray-800 p-5 rounded-2xl shadow-md h-full flex flex-col justify-between ${mission.completed ? 'opacity-50 grayscale border-transparent' : 'hover:border-gray-700'}`}
             >
-                <div className="flex justify-between items-start pointer-events-none">
-                    <div className="flex-1">
-                        {/* Título (Sin el botón círculo antiguo) */}
-                        <h3 className={`text-base font-bold mb-2 transition-all ${mission.completed ? 'text-gray-500 line-through decoration-2' : 'text-white'}`}>
+                <div>
+                    <div className="flex justify-between items-start mb-2">
+                        {/* Título */}
+                        <h3 className={`text-base font-bold transition-all ${mission.completed ? 'text-gray-500 line-through decoration-2' : 'text-white'}`}>
                             {mission.title}
                         </h3>
 
-                        {/* Badges / Etiquetas */}
-                        <div className="flex flex-wrap gap-2">
-                            <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded border ${getDifficultyColor(mission.difficulty)}`}>
-                                {mission.difficulty}
-                            </span>
-                            <span className="text-[10px] font-mono text-yellow-500 bg-yellow-900/20 px-2 py-1 rounded border border-yellow-900/30 font-bold">
-                                +{mission.xpReward}XP +{mission.coinReward}💰
-                            </span>
-                            {mission.lifePenalty > 0 && (
-                                <span className="text-[10px] font-mono text-red-400 bg-red-900/20 px-2 py-1 rounded border border-red-900/30 flex items-center gap-1 font-bold">
-                                    <HeartCrack size={10} /> -{mission.lifePenalty}
-                                </span>
-                            )}
+                        {/* Etiqueta Tipo */}
+                        <div className={`
+                            text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide flex items-center gap-1
+                            ${mission.type === 'habit' ? 'bg-blue-900/40 text-blue-300 border border-blue-500/30' : 'bg-orange-900/40 text-orange-300 border border-orange-500/30'}
+                        `}>
+                            {mission.type === 'habit' ? <Repeat size={10} /> : <Check size={10} />}
+                            {mission.type === 'habit' ? 'HÁBITO' : 'TEMPORAL'}
                         </div>
                     </div>
 
-                    {/* Indicadores de Swipe (Solo si no está completada) */}
-                    {!mission.completed && (
-                        <div className="flex flex-col items-center justify-center text-gray-700 opacity-40 ml-2 mt-1 gap-1">
-                            <ChevronRight size={16} />
-                            <ChevronLeft size={16} />
+                    {/* Etiquetas extra */}
+                    <div className="flex flex-wrap gap-2 mb-3">
+                        <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded border ${getDifficultyColor(mission.difficulty)}`}>
+                            {mission.difficulty}
+                        </span>
+                        {mission.lifePenalty > 0 && (
+                            <span className="text-[10px] font-mono text-red-400 bg-red-900/20 px-2 py-1 rounded border border-red-900/30 flex items-center gap-1 font-bold">
+                                <HeartCrack size={10} /> -{mission.lifePenalty}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Recompensas */}
+                    <div className="flex gap-2">
+                        <div className="flex items-center gap-1.5 bg-blue-600/10 px-2 py-1 rounded-lg border border-blue-500/20">
+                            <Star size={12} className="text-blue-400 fill-blue-400" />
+                            <span className="text-xs font-bold text-blue-200">+{mission.xpReward} XP</span>
                         </div>
-                    )}
+                        <div className="flex items-center gap-1.5 bg-yellow-600/10 px-2 py-1 rounded-lg border border-yellow-500/20">
+                            <Coins size={12} className="text-yellow-400" />
+                            <span className="text-xs font-bold text-yellow-200">+{mission.coinReward}</span>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Barra de Progreso (Si es misión de repeticiones) */}
+                {/* Barra de Progreso */}
                 {mission.target > 1 && (
                     <div className="mt-4 pointer-events-none">
                         <div className="flex justify-between text-[10px] text-gray-500 font-bold mb-1 uppercase tracking-wide">
@@ -151,6 +133,13 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
                         </div>
                     </div>
                 )}
+
+                {/* Flechas indicadoras de swipe */}
+                {!mission.completed && (
+                    <div className="absolute right-4 bottom-4 text-gray-700 opacity-20">
+                        <div className="flex"><ChevronLeft size={16} /><ChevronRight size={16} /></div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -158,7 +147,9 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
 
 // --- PÁGINA PRINCIPAL DE MISIONES ---
 export default function Missions() {
-    const { setUser } = useOutletContext();
+    // IMPORTANTE: Obtenemos user y setUser del contexto global
+    const { user, setUser } = useOutletContext();
+
     const [missions, setMissions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('daily');
@@ -178,16 +169,22 @@ export default function Missions() {
         fetchMissions();
     }, [activeTab]);
 
+    // --- FUNCIÓN CLAVE: CARGAR Y SINCRONIZAR ---
     const fetchMissions = async () => {
         try {
             const res = await api.get('/missions');
             setMissions(res.data.missions);
-            if (res.data.user) {
+
+            // CORRECCIÓN: Si el backend nos manda un usuario actualizado (y lo hará), 
+            // actualizamos el estado global para arreglar cualquier desincronización.
+            if (res.data.user && res.data.user.coins !== undefined) {
+                // Actualizamos el estado global de la App
                 setUser(res.data.user);
+                // Actualizamos el almacenamiento local para persistencia
                 localStorage.setItem('user', JSON.stringify(res.data.user));
             }
         } catch (error) {
-            console.error(error);
+            console.error("Error cargando misiones:", error);
         } finally {
             setLoading(false);
         }
@@ -198,21 +195,22 @@ export default function Missions() {
     const handleComplete = async (mission) => {
         try {
             const res = await api.put(`/missions/${mission._id}/complete`);
-            const { completed, xp, coins, user, synergyCount } = res.data;
+            const { xp, coins, user: updatedUser, synergyCount } = res.data;
 
-            // Recargamos para actualizar todas las misiones (incluidas las afectadas por sinergia)
-            fetchMissions();
+            fetchMissions(); // Recargamos la lista
 
+            // Si ganamos algo, actualizamos inmediatamente el usuario
             if (xp > 0 || coins > 0) {
-                setUser(user);
-                localStorage.setItem('user', JSON.stringify(user));
+                if (updatedUser) {
+                    setUser(updatedUser);
+                    localStorage.setItem('user', JSON.stringify(updatedUser));
+                }
+
                 let msg = `+${xp} XP | +${coins} Monedas`;
                 if (synergyCount > 0) msg += ` (Combo x${synergyCount} 🔥)`;
                 showToast(msg);
             }
-        } catch (error) {
-            showToast("Error al completar misión", "error");
-        }
+        } catch (error) { showToast("Error al completar", "error"); }
     };
 
     const handleDelete = async (id) => {
@@ -220,9 +218,7 @@ export default function Missions() {
             await api.delete(`/missions/${id}`);
             setMissions(prev => prev.filter(m => m._id !== id));
             showToast("Misión eliminada", "info");
-        } catch (error) {
-            showToast("Error al borrar", "error");
-        }
+        } catch (error) { showToast("Error al borrar", "error"); }
     };
 
     const handleCreate = async () => {
@@ -233,9 +229,7 @@ export default function Missions() {
             setNewMission({ ...newMission, title: '', target: 1 });
             fetchMissions();
             showToast("¡Nueva misión añadida!");
-        } catch (error) {
-            showToast("Error creando misión", "error");
-        }
+        } catch (error) { showToast("Error creando misión", "error"); }
     };
 
     const filteredMissions = missions.filter(m => m.frequency === activeTab);
@@ -250,9 +244,39 @@ export default function Missions() {
         }
     };
 
+    const getExpirationDate = (freq) => {
+        const now = new Date();
+        let targetDate = new Date();
+
+        switch (freq) {
+            case 'daily':
+                break;
+            case 'weekly':
+                const day = now.getDay();
+                const diff = day === 0 ? 0 : 7 - day;
+                targetDate.setDate(now.getDate() + diff);
+                break;
+            case 'monthly':
+                targetDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                break;
+            case 'yearly':
+                targetDate = new Date(now.getFullYear(), 11, 31);
+                break;
+            default:
+                return '';
+        }
+
+        const dd = String(targetDate.getDate()).padStart(2, '0');
+        const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+        const yyyy = targetDate.getFullYear();
+
+        return `${dd}-${mm}-${yyyy}`;
+    };
+
+    const expirationString = getExpirationDate(activeTab);
+
     return (
         <div className="pb-24 pt-4 px-4 min-h-screen animate-in fade-in select-none">
-
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
             {/* HEADER */}
@@ -275,13 +299,12 @@ export default function Missions() {
                 </div>
             </div>
 
-            {/* LISTA DE MISIONES */}
+            {/* LISTA */}
             <div className="mt-4">
                 {filteredMissions.length === 0 && !loading ? (
                     <div className="text-center py-20 opacity-50">
                         <Trophy size={48} className="mx-auto text-gray-600 mb-2" />
                         <p className="text-gray-400 text-sm">No hay misiones activas</p>
-                        <p className="text-gray-600 text-xs mt-2">¡Crea una para empezar!</p>
                     </div>
                 ) : (
                     filteredMissions.map(m => (
@@ -294,36 +317,37 @@ export default function Missions() {
                         />
                     ))
                 )}
-                {/* Espacio extra al final para que el FAB no tape nada si la lista es larga */}
+
+                {/* FECHA CADUCIDAD */}
+                <div className="mt-8 mb-4 flex items-center justify-center gap-2 text-gray-500 opacity-60">
+                    <CalendarClock size={14} />
+                    <span className="text-xs font-mono font-medium tracking-wider">
+                        CADUCA: {expirationString}
+                    </span>
+                </div>
+
                 <div className="h-20"></div>
             </div>
 
-            {/* MODAL CREADOR (Bottom Sheet) */}
+            {/* MODAL CREADOR */}
             {showCreator && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center sm:px-4 animate-in fade-in duration-200">
                     <div className="bg-gray-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl border-t sm:border border-gray-800 p-6 animate-in slide-in-from-bottom duration-300 shadow-2xl">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-bold text-white">Nueva Misión</h2>
-                            <button onClick={() => setShowCreator(false)} className="bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white transition-colors"><X size={20} /></button>
+                            <button onClick={() => setShowCreator(false)} className="bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
                         </div>
 
                         <div className="space-y-5">
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Título</label>
-                                <input
-                                    type="text"
-                                    placeholder="Ej: Leer 30 min"
-                                    autoFocus
-                                    value={newMission.title}
-                                    onChange={e => setNewMission({ ...newMission, title: e.target.value })}
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-xl p-4 text-white focus:border-blue-500 focus:outline-none mt-2 text-lg font-medium placeholder-gray-600 transition-colors"
-                                />
+                                <input type="text" placeholder="Ej: Leer 30 min" autoFocus value={newMission.title} onChange={e => setNewMission({ ...newMission, title: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-4 text-white focus:border-blue-500 focus:outline-none mt-2 text-lg font-medium" />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Frecuencia</label>
-                                    <select value={newMission.frequency} onChange={e => setNewMission({ ...newMission, frequency: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white focus:outline-none mt-2 appearance-none">
+                                    <select value={newMission.frequency} onChange={e => setNewMission({ ...newMission, frequency: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white mt-2">
                                         <option value="daily">Diaria</option>
                                         <option value="weekly">Semanal</option>
                                         <option value="monthly">Mensual</option>
@@ -332,9 +356,9 @@ export default function Missions() {
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tipo</label>
-                                    <select value={newMission.type} onChange={e => setNewMission({ ...newMission, type: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white focus:outline-none mt-2 appearance-none">
-                                        <option value="habit">Fija (Hábito)</option>
-                                        <option value="temporal">Temporal</option>
+                                    <select value={newMission.type} onChange={e => setNewMission({ ...newMission, type: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white mt-2">
+                                        <option value="habit">Hábito (Fija)</option>
+                                        <option value="temporal">Tarea (Temporal)</option>
                                     </select>
                                 </div>
                             </div>
@@ -342,11 +366,11 @@ export default function Missions() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Repeticiones</label>
-                                    <input type="number" min="1" value={newMission.target} onChange={e => setNewMission({ ...newMission, target: parseInt(e.target.value) })} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white focus:outline-none mt-2" />
+                                    <input type="number" min="1" value={newMission.target} onChange={e => setNewMission({ ...newMission, target: parseInt(e.target.value) })} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white mt-2" />
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dificultad</label>
-                                    <select value={newMission.difficulty} onChange={e => setNewMission({ ...newMission, difficulty: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white focus:outline-none mt-2 appearance-none">
+                                    <select value={newMission.difficulty} onChange={e => setNewMission({ ...newMission, difficulty: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white mt-2">
                                         <option value="easy">Fácil (-5 Vida)</option>
                                         <option value="medium">Media (-3 Vida)</option>
                                         <option value="hard">Difícil (-1 Vida)</option>
@@ -355,9 +379,7 @@ export default function Missions() {
                                 </div>
                             </div>
 
-                            <button onClick={handleCreate} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 py-4 rounded-xl text-white font-bold shadow-lg shadow-blue-900/30 mt-4 active:scale-95 transition-transform hover:from-blue-500 hover:to-indigo-500">
-                                Crear Misión
-                            </button>
+                            <button onClick={handleCreate} className="w-full bg-blue-600 py-4 rounded-xl text-white font-bold shadow-lg mt-4 active:scale-95 transition-transform">Crear Misión</button>
                         </div>
                     </div>
                 </div>

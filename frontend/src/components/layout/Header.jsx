@@ -1,57 +1,84 @@
-import { useNavigate } from 'react-router-dom';
-import { Heart, Coins } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 
-export default function Header({ user }) {
-    const navigate = useNavigate();
+export default function Header({ user, logout }) {
     if (!user) return null;
 
-    // Accedemos a las propiedades DIRECTAMENTE (sin .stats)
-    // Usamos || 0 por seguridad si algún dato falta
+    // Datos seguros con valores por defecto
     const level = user.level || 1;
     const currentXP = user.currentXP || 0;
     const nextLevelXP = user.nextLevelXP || 100;
     const coins = user.coins || 0;
-    const lives = user.lives || 5;
+    const lives = user.lives || 5; // Valor por defecto 5 (estándar en juegos)
 
+    // CORRECCIÓN DE NOMBRE: Busca username, luego name, o pone "Usuario"
+    const username = user.username || user.name || "Usuario";
+
+    // Cálculo porcentaje XP (máximo 100%)
     const xpPercentage = Math.min((currentXP / nextLevelXP) * 100, 100);
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 bg-gray-950/90 backdrop-blur-md border-b border-gray-800 h-20 px-4 flex items-center justify-between shadow-lg">
+        <header className="fixed top-0 left-0 right-0 z-50 bg-gray-950/95 backdrop-blur-md border-b border-gray-800 h-20 px-4 shadow-lg select-none">
+            <div className="max-w-md mx-auto h-full flex items-center justify-between gap-3">
 
-            <div className="flex items-center gap-3">
-                {/* Nivel */}
-                <div onClick={() => navigate('/profile')} className="relative cursor-pointer">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 border-2 border-blue-400 flex items-center justify-center">
-                        <span className="text-white font-bold text-lg">{level}</span>
+                {/* --- GRUPO IZQUIERDA: NIVEL + NOMBRE/XP --- */}
+                <div className="flex items-center gap-3 flex-1">
+
+                    {/* 1. NIVEL (Círculo Grande) - Link a Perfil */}
+                    <Link to="/profile" className="flex-shrink-0">
+                        <div className="relative w-12 h-12 flex items-center justify-center cursor-pointer active:scale-95 transition-transform rounded-full border-2 border-blue-500 bg-gray-900">
+                            <span className="text-xl font-black text-white">{level}</span>
+                        </div>
+                    </Link>
+
+                    {/* 2. NOMBRE Y BARRA XP (Columna) */}
+                    <div className="flex flex-col w-full max-w-[140px]">
+                        {/* Nombre de Usuario */}
+                        <h2 className="text-white font-bold text-sm truncate mb-1 capitalize">
+                            {username}
+                        </h2>
+
+                        {/* Barra XP con texto DENTRO */}
+                        <div className="relative w-full h-4 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+                            {/* Relleno Azul */}
+                            <div
+                                className="h-full bg-blue-600 transition-all duration-500 ease-out"
+                                style={{ width: `${xpPercentage}%` }}
+                            ></div>
+
+                            {/* Texto centrado absoluto */}
+                            <div className="absolute inset-0 flex items-center justify-center z-10">
+                                <span className="text-[9px] font-bold text-white drop-shadow-md tracking-wider">
+                                    {currentXP}/{nextLevelXP} XP
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* Info + XP */}
-                <div className="flex flex-col justify-center">
-                    <h2 className="text-white font-bold text-sm truncate max-w-[120px]">
-                        {user.username}
-                    </h2>
-                    <div className="w-24 h-2 bg-gray-800 rounded-full mt-1 relative overflow-hidden">
-                        <div
-                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-500"
-                            style={{ width: `${xpPercentage}%` }}
-                        ></div>
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-0.5 font-mono">
-                        {currentXP}/{nextLevelXP} XP
-                    </p>
-                </div>
-            </div>
+                {/* --- GRUPO DERECHA: CAJAS DE STATS --- */}
+                <div className="flex items-center gap-2">
 
-            <div className="flex items-center gap-2">
-                <div className="flex flex-col items-center bg-gray-900 border border-yellow-900/50 px-2 py-1 rounded-lg min-w-[50px]">
-                    <Coins size={16} className="text-yellow-400 mb-0.5" />
-                    <span className="text-yellow-100 text-xs font-bold">{coins}</span>
+                    {/* Caja Monedas [ 500 💰 ] - AHORA ES UN LINK A /GAMES */}
+                    <Link to="/games">
+                        <div className="flex items-center gap-1.5 bg-gray-900 border border-yellow-500/30 px-2 py-1.5 rounded-md cursor-pointer hover:bg-gray-800 transition-colors active:scale-95 group">
+                            <span className="font-bold text-white text-sm group-hover:text-yellow-400 transition-colors">{coins}</span>
+                            <span className="text-xs">💰</span>
+                        </div>
+                    </Link>
+
+                    {/* Caja Vidas [ 5 ❤️ ] */}
+                    <div className="flex items-center gap-1.5 bg-gray-900 border border-gray-600 px-2 py-1.5 rounded-md">
+                        <span className="font-bold text-white text-sm">{lives}</span>
+                        <span className="text-xs">❤️</span>
+                    </div>
+
+                    {/* Botón Salir */}
+                    <button onClick={logout} className="text-gray-600 hover:text-red-400 ml-1 transition-colors">
+                        <LogOut size={16} />
+                    </button>
                 </div>
-                <div className="flex flex-col items-center bg-gray-900 border border-red-900/50 px-2 py-1 rounded-lg min-w-[50px]">
-                    <Heart size={16} className="text-red-500 fill-red-500 mb-0.5" />
-                    <span className="text-red-100 text-xs font-bold">{lives}</span>
-                </div>
+
             </div>
         </header>
     );

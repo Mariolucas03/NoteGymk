@@ -1,27 +1,48 @@
 const mongoose = require('mongoose');
 
-const setSchema = new mongoose.Schema({
-    reps: { type: Number, required: true },
-    weight: { type: Number, required: true }, // kg
-    completed: { type: Boolean, default: true }
-});
-
-const workoutLogSchema = new mongoose.Schema({
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    routine: { type: mongoose.Schema.Types.ObjectId, ref: 'Routine' }, // Referencia a la plantilla
-    routineName: { type: String }, // Guardamos nombre por si borras la rutina original
-
-    date: { type: Date, default: Date.now },
-    duration: { type: Number, default: 0 }, // minutos
-
+const workoutLogSchema = mongoose.Schema({
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        required: true,
+        ref: 'User'
+    },
+    routine: { // ID de la rutina (solo para pesas)
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Routine'
+    },
+    routineName: {
+        type: String,
+        required: true
+    },
+    duration: { // Segundos
+        type: Number,
+        required: true
+    },
+    // --- ESTO ES LO QUE FALTABA PARA QUE FUNCIONE LA SEPARACIÓN ---
+    type: {
+        type: String,
+        enum: ['gym', 'sport'],
+        default: 'gym' // Por defecto todo es gym salvo que digamos lo contrario
+    },
+    intensity: { type: String }, // Solo para sport
+    distance: { type: Number },  // Solo para sport
+    // ------------------------------------------------------------
     exercises: [{
-        name: { type: String, required: true },
-        sets: [setSchema] // Aquí guardamos: 10 reps con 50kg, 8 reps con 55kg...
+        name: String,
+        sets: [{
+            weight: Number,
+            reps: Number,
+            completed: Boolean
+        }]
     }],
-
-    // Recompensas ganadas en esta sesión
     earnedXP: { type: Number, default: 0 },
-    earnedCoins: { type: Number, default: 0 }
+    earnedCoins: { type: Number, default: 0 },
+    date: {
+        type: Date,
+        default: Date.now
+    }
+}, {
+    timestamps: true
 });
 
 module.exports = mongoose.model('WorkoutLog', workoutLogSchema);

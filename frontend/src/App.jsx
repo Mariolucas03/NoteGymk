@@ -11,6 +11,12 @@ import Food from './pages/Food';
 import Gym from './pages/Gym';
 import Shop from './pages/Shop';
 import Profile from './pages/Profile';
+import Games from './pages/Games';
+import FortuneWheel from './pages/games/FortuneWheel';
+import ScratchGame from './pages/games/ScratchGame';
+import DiceGame from './pages/games/DiceGame';
+import Roulette from './pages/games/Roulette';
+
 
 function App() {
     return (
@@ -29,6 +35,11 @@ function App() {
                     <Route path="/gym" element={<Gym />} />
                     <Route path="/shop" element={<Shop />} />
                     <Route path="/profile" element={<Profile />} />
+                    <Route path="/games" element={<Games />} />
+                    <Route path="/games/fortune-wheel" element={<FortuneWheel />} />
+                    <Route path="/games/scratch" element={<ScratchGame />} />
+                    <Route path="/games/dice" element={<DiceGame />} />
+                    <Route path="/games/roulette" element={<Roulette />} />
                 </Route>
             </Routes>
         </Router>

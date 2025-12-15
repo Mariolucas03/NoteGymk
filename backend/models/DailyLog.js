@@ -1,23 +1,24 @@
 const mongoose = require('mongoose');
 
-const dailyLogSchema = new mongoose.Schema({
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    date: { type: String, required: true }, // Formato "YYYY-MM-DD" para buscar fácil
+const dailyLogSchema = mongoose.Schema({
+    // Vinculación obligatoria al usuario
+    user: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
 
-    // WIDGETS DATA
-    mood: { type: String, enum: ['happy', 'neutral', 'sad', null], default: null },
-    weight: { type: Number, default: 0 },
-    sleepHours: { type: Number, default: 0 },
-    water: { type: Number, default: 0 }, // Vasos de agua (extra común)
-    steps: { type: Number, default: 0 },
+    // Fecha en formato YYYY-MM-DD
+    date: { type: String, required: true },
 
-    // RESUMEN NUTRICIONAL
+    // --- TUS CAMPOS ---
+    mood: { type: String, default: null },
+    weight: { type: Number },
+    sleepHours: { type: Number },
+    steps: { type: Number },
     totalKcal: { type: Number, default: 0 },
 
-    createdAt: { type: Date, default: Date.now }
-});
+}, { timestamps: true });
 
-// Índice para que la búsqueda por usuario+fecha sea instantánea
+// --- LA CLAVE PARA ARREGLARLO ---
+// Esto asegura que la combinación Usuario + Fecha sea ÚNICA en la base de datos.
+// Evita duplicados y mezclas extrañas.
 dailyLogSchema.index({ user: 1, date: 1 }, { unique: true });
 
 module.exports = mongoose.model('DailyLog', dailyLogSchema);

@@ -9,7 +9,9 @@ const {
     analyzeImage,
     getSavedFoods,
     saveCustomFood,
-    deleteSavedFood // <--- Importar
+    deleteSavedFood,
+    updateSavedFood, // <--- Importar
+    chatMacroCalculator
 } = require('../controllers/foodController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -21,9 +23,13 @@ router.post('/category', protect, addMealCategory);
 router.post('/seed', protect, seedFoods);
 router.post('/analyze', protect, upload.single('image'), analyzeImage);
 
-// Rutas de Comidas Guardadas
+// Mis Comidas
 router.get('/saved', protect, getSavedFoods);
 router.post('/save', protect, saveCustomFood);
-router.delete('/saved/:id', protect, deleteSavedFood); // <--- NUEVA RUTA
+router.delete('/saved/:id', protect, deleteSavedFood);
+router.put('/saved/:id', protect, updateSavedFood); // <--- NUEVA RUTA EDITAR
+
+// Chat
+router.post('/chat-macros', protect, chatMacroCalculator);
 
 module.exports = router;

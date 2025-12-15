@@ -1,36 +1,34 @@
 const jwt = require('jsonwebtoken');
+const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 
-const protect = async (req, res, next) => {
+const protect = asyncHandler(async (req, res, next) => {
     let token;
 
+    // Verificar si hay header de autorización que empiece por Bearer
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
-            // 1. Obtener token del header
+            // Obtener el token del header (Bearer token_aqui)
             token = req.headers.authorization.split(' ')[1];
 
-            // 2. Verificar firma del token
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secreto_super_seguro');
+            // Verificar token
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_temporal');
 
-            // 3. Buscar usuario en BBDD (sin password)
+            // Obtener usuario del token (sin la contraseña)
             req.user = await User.findById(decoded.id).select('-password');
-
-            // --- PROTECCIÓN EXTRA: SI EL USUARIO YA NO EXISTE EN DB ---
-            if (!req.user) {
-                return res.status(401).json({ message: 'Usuario no encontrado (Token inválido)' });
-            }
-            // ----------------------------------------------------------
 
             next();
         } catch (error) {
             console.error(error);
-            return res.status(401).json({ message: 'No autorizado, token fallido' });
+            res.status(401);
+            throw new Error('No autorizado, token fallido');
         }
     }
 
     if (!token) {
-        return res.status(401).json({ message: 'No autorizado, falta token' });
+        res.status(401);
+        throw new Error('No autorizado, no hay token');
     }
-};
+});
 
 module.exports = { protect };

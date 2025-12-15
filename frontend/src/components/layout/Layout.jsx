@@ -1,44 +1,81 @@
-import { useEffect, useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom'; // Outlet es donde se renderiza la página hija
+import { Outlet, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import Header from './Header';
-import Footer from './Footer';
-// Aquí importaremos el Footer más adelante
+import Footer from './Footer'; // <--- 1. IMPORTANTE: Importamos el Footer
+import api from '../../services/api';
 
 export default function Layout() {
     const navigate = useNavigate();
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
 
+    // 1. INICIALIZACIÓN INTELIGENTE:
+    // Al cargar la página, intentamos leer el usuario guardado en el navegador.
+    const [user, setUser] = useState(() => {
+        const savedUser = localStorage.getItem('user');
+        return savedUser ? JSON.parse(savedUser) : null;
+    });
+
+    // 2. SINCRONIZACIÓN EN SEGUNDO PLANO:
     useEffect(() => {
-        // 1. Verificar sesión
+        const fetchUserData = async () => {
+            try {
+                // Usamos /daily porque devuelve el usuario actualizado (monedas, nivel, XP)
+                const res = await api.get('/daily');
+
+                if (res.data.user) {
+                    // Mezclamos lo que teníamos con lo nuevo por seguridad
+                    const updatedUser = { ...user, ...res.data.user };
+
+                    setUser(updatedUser);
+                    // Guardamos en memoria local para la próxima vez
+                    localStorage.setItem('user', JSON.stringify(updatedUser));
+                }
+            } catch (error) {
+                console.error("Error actualizando usuario en Layout:", error);
+                // Si el token falló, podrías redirigir al login:
+                // if (error.response?.status === 401) logout();
+            }
+        };
+
+        // Solo llamamos a la API si tenemos un token (estamos logueados)
         const token = localStorage.getItem('token');
-        const storedUser = localStorage.getItem('user');
-
-        if (!token || !storedUser) {
+        if (token) {
+            fetchUserData();
+        } else {
             navigate('/login');
-            return;
         }
+    }, []);
 
-        // 2. Cargar datos (Aquí podríamos refrescarlos desde la API en el futuro)
-        setUser(JSON.parse(storedUser));
-        setLoading(false);
-    }, [navigate]);
+    // Función para cerrar sesión limpia
+    const logout = () => {
+        setUser(null);
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        navigate('/login');
+    };
 
-    if (loading) return <div className="bg-black min-h-screen text-white flex items-center justify-center">Cargando NoteGymk...</div>;
+    // Función auxiliar para que los hijos (Home, Games...) puedan actualizar el usuario
+    const handleUserUpdate = (newData) => {
+        setUser((prev) => {
+            const updated = { ...prev, ...newData };
+            localStorage.setItem('user', JSON.stringify(updated));
+            return updated;
+        });
+    };
 
     return (
-        <div className="min-h-screen bg-black">
-            {/* Header Fijo */}
-            <Header user={user} />
+        // Usamos pb-24 (padding bottom) para que el Footer no tape el contenido final
+        <div className="min-h-screen bg-black text-white pb-24 font-sans relative">
 
-            {/* Contenido Principal */}
-            {/* pt-24 da espacio arriba para que el header fijo no tape el contenido */}
-            <main className="pt-24 px-4 pb-24 text-white">
-                <Outlet context={{ user, setUser }} />
+            {/* El Header siempre recibe el usuario actualizado */}
+            <Header user={user} logout={logout} />
+
+            <main className="pt-24 px-4 max-w-md mx-auto">
+                {/* Pasamos 'user' y 'setUser' a todas las páginas */}
+                <Outlet context={{ user, setUser: handleUserUpdate }} />
             </main>
 
-            {/* Footer Fijo Abajo */}
-            <Footer /> {/* <--- 2. AÑADIR COMPONENTE */}
+            {/* --- 2. AQUÍ PONEMOS EL FOOTER --- */}
+            <Footer />
         </div>
     );
 }

@@ -1,79 +1,70 @@
 import { useState, useEffect } from 'react';
-import { Smile, Meh, Frown } from 'lucide-react';
-import api from '../../services/api';
+import { Smile, Frown, Meh, Angry, Laugh } from 'lucide-react';
 
-export default function MoodWidget({ initialMood }) {
-    const [mood, setMood] = useState(initialMood);
-    const [loading, setLoading] = useState(false);
+export default function MoodWidget({ mood, onUpdate }) {
+    // 1. Iniciamos el estado con lo que venga de la base de datos (o null)
+    const [selected, setSelected] = useState(mood);
 
-    // Sincronizar si viene dato inicial del padre
+    // 2. EFECTO CLAVE: Cuando 'mood' cambie (al cargar la página), actualizamos la selección
     useEffect(() => {
-        if (initialMood) setMood(initialMood);
-    }, [initialMood]);
+        setSelected(mood);
+    }, [mood]);
 
-    const handleMoodSelect = async (selectedMood) => {
-        setMood(selectedMood);
-        setLoading(true);
-        try {
-            // Enviamos al backend: type='mood', value='happy'/'neutral'/'sad'
-            await api.put('/daily/update', { type: 'mood', value: selectedMood });
-        } catch (error) {
-            console.error("Error guardando ánimo", error);
-        } finally {
-            setLoading(false);
-        }
+    const moods = [
+        { value: 'rad', icon: Laugh, color: 'text-green-400', label: 'Genial' },
+        { value: 'good', icon: Smile, color: 'text-blue-400', label: 'Bien' },
+        { value: 'meh', icon: Meh, color: 'text-gray-400', label: 'Normal' },
+        { value: 'bad', icon: Frown, color: 'text-orange-400', label: 'Mal' },
+        { value: 'awful', icon: Angry, color: 'text-red-500', label: 'Fatal' },
+    ];
+
+    const handleSelect = (value) => {
+        setSelected(value); // Actualiza visualmente al instante
+        onUpdate(value);    // Envía a la base de datos para guardar
     };
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 flex flex-col justify-between h-40 shadow-lg relative overflow-hidden">
-
-            {/* Título */}
-            <div className="flex justify-between items-start z-10">
-                <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider">Estado de Ánimo</h3>
-                {loading && <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 h-full flex flex-col justify-between">
+            <div className="flex justify-between items-center mb-2">
+                <h3 className="text-gray-400 text-xs font-bold uppercase">Estado de Ánimo</h3>
             </div>
 
-            {/* Botones */}
-            <div className="flex justify-between items-center mt-2 z-10">
+            <div className="flex justify-between items-center px-1">
+                {moods.map((m) => {
+                    const Icon = m.icon;
+                    const isSelected = selected === m.value;
 
-                {/* HAPPY */}
-                <button
-                    onClick={() => handleMoodSelect('happy')}
-                    className={`p-3 rounded-xl transition-all transform active:scale-95 ${mood === 'happy' ? 'bg-green-500/20 text-green-400 ring-2 ring-green-500' : 'bg-gray-800 text-gray-600 hover:bg-gray-800/80'}`}
-                >
-                    <Smile size={32} />
-                </button>
-
-                {/* NEUTRAL */}
-                <button
-                    onClick={() => handleMoodSelect('neutral')}
-                    className={`p-3 rounded-xl transition-all transform active:scale-95 ${mood === 'neutral' ? 'bg-yellow-500/20 text-yellow-400 ring-2 ring-yellow-500' : 'bg-gray-800 text-gray-600 hover:bg-gray-800/80'}`}
-                >
-                    <Meh size={32} />
-                </button>
-
-                {/* SAD */}
-                <button
-                    onClick={() => handleMoodSelect('sad')}
-                    className={`p-3 rounded-xl transition-all transform active:scale-95 ${mood === 'sad' ? 'bg-red-500/20 text-red-400 ring-2 ring-red-500' : 'bg-gray-800 text-gray-600 hover:bg-gray-800/80'}`}
-                >
-                    <Frown size={32} />
-                </button>
-
+                    return (
+                        <button
+                            key={m.value}
+                            onClick={() => handleSelect(m.value)}
+                            className={`flex flex-col items-center gap-1 transition-all duration-200 outline-none ${isSelected
+                                    ? 'scale-110 opacity-100'
+                                    : 'opacity-40 hover:opacity-70 hover:scale-105'
+                                }`}
+                        >
+                            <div className={`p-2 rounded-full transition-all ${isSelected
+                                    ? 'bg-gray-800 ring-2 ring-offset-2 ring-offset-gray-900 ring-blue-500'
+                                    : 'bg-transparent'
+                                }`}>
+                                <Icon
+                                    size={24}
+                                    className={isSelected ? m.color : 'text-gray-400'}
+                                    fill={isSelected ? "currentColor" : "none"}
+                                    fillOpacity={0.2}
+                                />
+                            </div>
+                        </button>
+                    );
+                })}
             </div>
 
-            {/* Texto de estado actual */}
-            <p className="text-center text-sm font-medium text-gray-500 mt-2 z-10">
-                {mood === 'happy' && "¡Sigue así! 🔥"}
-                {mood === 'neutral' && "Día tranquilo 🌊"}
-                {mood === 'sad' && "Mañana será mejor 💪"}
-                {!mood && "Registra tu día"}
-            </p>
-
-            {/* Decoración Fondo */}
-            <div className={`absolute -bottom-10 -right-10 w-32 h-32 rounded-full blur-3xl opacity-10 transition-colors duration-500
-        ${mood === 'happy' ? 'bg-green-500' : mood === 'sad' ? 'bg-red-500' : mood === 'neutral' ? 'bg-yellow-500' : 'bg-transparent'}
-      `} />
+            <div className="text-center h-4 mt-1">
+                <span className={`text-xs font-bold uppercase tracking-widest transition-colors ${selected ? 'text-white' : 'text-gray-600'
+                    }`}>
+                    {moods.find(m => m.value === selected)?.label || "Selecciona"}
+                </span>
+            </div>
         </div>
     );
 }

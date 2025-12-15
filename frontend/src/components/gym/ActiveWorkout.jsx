@@ -4,27 +4,36 @@ import api from '../../services/api';
 import Toast from '../common/Toast';
 
 export default function ActiveWorkout({ routine, onClose, onFinish }) {
+    // 1. Estado del Cronómetro
     const [seconds, setSeconds] = useState(0);
-    const [exercises, setExercises] = useState(
-        routine.exercises.map(ex => ({
+
+    // 2. Estado de los Ejercicios (Inicialización segura)
+    const [exercises, setExercises] = useState(() => {
+        if (!routine || !routine.exercises) return [];
+        return routine.exercises.map(ex => ({
             ...ex,
-            setsData: Array(ex.sets).fill({ kg: '', reps: '', completed: false })
-        }))
-    );
+            // Creamos las series vacías para rellenar
+            setsData: Array(ex.sets || 3).fill({ kg: '', reps: '', completed: false })
+        }));
+    });
+
     const [finishing, setFinishing] = useState(false);
     const [toast, setToast] = useState(null);
 
+    // Iniciar cronómetro al montar
     useEffect(() => {
         const timer = setInterval(() => setSeconds(s => s + 1), 1000);
         return () => clearInterval(timer);
     }, []);
 
+    // Formatear tiempo (MM:SS)
     const formatTime = (totalSeconds) => {
         const min = Math.floor(totalSeconds / 60);
         const sec = totalSeconds % 60;
         return `${min}:${sec < 10 ? '0' : ''}${sec}`;
     };
 
+    // Manejar cambios en los inputs (Kg / Reps)
     const handleInputChange = (exIndex, setIndex, field, value) => {
         const updatedEx = [...exercises];
         const newSets = [...updatedEx[exIndex].setsData];
@@ -33,17 +42,22 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         setExercises(updatedEx);
     };
 
+    // Marcar serie como completada
     const toggleSetComplete = (exIndex, setIndex) => {
         const updatedEx = [...exercises];
         const currentSet = updatedEx[exIndex].setsData[setIndex];
-        if (!currentSet.kg || !currentSet.reps) return setToast({ message: 'Rellena Kg y Reps primero', type: 'error' });
+
+        // Validación simple: Deben tener datos para marcar como hecha
+        if (!currentSet.kg || !currentSet.reps) {
+            return setToast({ message: 'Rellena Kg y Reps primero', type: 'error' });
+        }
 
         updatedEx[exIndex].setsData[setIndex] = { ...currentSet, completed: !currentSet.completed };
         setExercises(updatedEx);
     };
 
+    // Finalizar Entrenamiento
     const handleFinish = async () => {
-        // ELIMINADO EL CONFIRM MOLESTO
         setFinishing(true);
 
         try {
@@ -54,8 +68,8 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                 exercises: exercises.map(ex => ({
                     name: ex.name,
                     sets: ex.setsData.map(s => ({
-                        weight: parseFloat(s.kg) || 0,
-                        reps: parseFloat(s.reps) || 0,
+                        weight: parseFloat(s.kg) || 0, // Evitar NaN
+                        reps: parseFloat(s.reps) || 0,   // Evitar NaN
                         completed: s.completed
                     }))
                 }))
@@ -63,7 +77,7 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
 
             const res = await api.post('/gym/log', logData);
 
-            // Pasamos TODO lo que devuelve el backend (user, xp, coins)
+            // Pasamos la respuesta completa al padre (Gym.jsx) para mostrar recompensas
             onFinish(res.data);
 
         } catch (error) {
@@ -73,6 +87,9 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         }
     };
 
+    // Si no hay datos de rutina válidos, mostramos error o cerramos
+    if (!routine) return null;
+
     return (
         <div className="fixed inset-0 z-[60] bg-black flex flex-col animate-in slide-in-from-bottom duration-300">
 
@@ -80,47 +97,96 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
 
             {/* HEADER */}
             <div className="flex justify-between items-center p-4 bg-gray-900 border-b border-gray-800 sticky top-0 z-20">
-                <button onClick={onClose} className="text-gray-400"><ChevronDown /></button>
+                <button onClick={onClose} className="text-gray-400 p-2 hover:bg-gray-800 rounded-full transition-colors">
+                    <ChevronDown />
+                </button>
                 <div className="flex flex-col items-center">
-                    <span className="text-white font-bold">{routine.name}</span>
-                    <div className="flex items-center gap-1 text-blue-400 font-mono text-sm">
+                    <span className="text-white font-bold text-lg">{routine.name}</span>
+                    <div className="flex items-center gap-1 text-blue-400 font-mono text-sm bg-blue-900/20 px-2 py-0.5 rounded-md border border-blue-500/20">
                         <Clock size={14} />{formatTime(seconds)}
                     </div>
                 </div>
                 <button
                     onClick={handleFinish}
                     disabled={finishing}
-                    className="bg-blue-600 px-4 py-1.5 rounded-full text-white font-bold text-sm shadow-lg shadow-blue-900/20"
+                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-5 py-2 rounded-full text-white font-bold text-sm shadow-lg shadow-blue-900/20 transition-all active:scale-95"
                 >
                     {finishing ? '...' : 'Terminar'}
                 </button>
             </div>
 
-            {/* BODY */}
-            <div className="flex-1 overflow-y-auto p-4 pb-20 space-y-6">
+            {/* BODY (Lista de Ejercicios) */}
+            <div className="flex-1 overflow-y-auto p-4 pb-20 space-y-6 custom-scrollbar">
                 {exercises.map((ex, exIdx) => (
                     <div key={ex._id || exIdx} className="space-y-3">
+                        {/* Cabecera del Ejercicio */}
                         <div className="flex justify-between items-center">
-                            <h3 className="text-blue-400 font-bold text-lg">{ex.name}</h3>
-                            <button className="text-gray-600"><MoreVertical size={20} /></button>
+                            <h3 className="text-blue-400 font-bold text-lg tracking-tight">{ex.name}</h3>
+                            <button className="text-gray-600 hover:text-gray-400"><MoreVertical size={20} /></button>
                         </div>
-                        <div className="w-full">
-                            <div className="grid grid-cols-10 gap-2 mb-2 text-xs text-gray-500 font-bold text-center uppercase tracking-wider">
+
+                        {/* Tabla de Sets */}
+                        <div className="w-full bg-gray-900/50 rounded-xl p-2 border border-gray-800">
+                            {/* Cabecera de columnas */}
+                            <div className="grid grid-cols-10 gap-2 mb-2 text-[10px] text-gray-500 font-bold text-center uppercase tracking-wider">
                                 <div className="col-span-1">#</div>
                                 <div className="col-span-3 text-left pl-2">Previo</div>
                                 <div className="col-span-2">Kg</div>
                                 <div className="col-span-2">Reps</div>
                                 <div className="col-span-2"><Check size={14} className="mx-auto" /></div>
                             </div>
-                            <div className="space-y-2">
+
+                            {/* Filas de Sets */}
+                            <div className="space-y-1">
                                 {ex.setsData.map((set, setIdx) => (
-                                    <div key={setIdx} className={`grid grid-cols-10 gap-2 items-center rounded-lg p-2 transition-colors ${set.completed ? 'bg-green-900/20' : 'bg-gray-900'}`}>
-                                        <div className="col-span-1 text-center font-bold text-gray-400 bg-gray-800 rounded py-1">{setIdx + 1}</div>
-                                        <div className="col-span-3 text-left pl-2 text-gray-600 text-xs">-</div>
-                                        <div className="col-span-2"><input type="number" placeholder="0" value={set.kg} onChange={(e) => handleInputChange(exIdx, setIdx, 'kg', e.target.value)} className={`w-full text-center bg-transparent font-bold focus:outline-none rounded py-1 ${set.completed ? 'text-green-400' : 'text-white bg-gray-800'}`} /></div>
-                                        <div className="col-span-2"><input type="number" placeholder="0" value={set.reps} onChange={(e) => handleInputChange(exIdx, setIdx, 'reps', e.target.value)} className={`w-full text-center bg-transparent font-bold focus:outline-none rounded py-1 ${set.completed ? 'text-green-400' : 'text-white bg-gray-800'}`} /></div>
+                                    <div
+                                        key={setIdx}
+                                        className={`grid grid-cols-10 gap-2 items-center rounded-lg p-2 transition-all duration-200 ${set.completed ? 'bg-green-900/20 border border-green-500/30' : 'bg-gray-900 border border-transparent'
+                                            }`}
+                                    >
+                                        {/* Número de serie */}
+                                        <div className="col-span-1 text-center font-bold text-gray-400 bg-gray-800 rounded py-1.5 text-xs">
+                                            {setIdx + 1}
+                                        </div>
+
+                                        {/* Dato Previo (Placeholder por ahora) */}
+                                        <div className="col-span-3 text-left pl-2 text-gray-600 text-xs font-mono">
+                                            -
+                                        </div>
+
+                                        {/* Input KG */}
+                                        <div className="col-span-2">
+                                            <input
+                                                type="number"
+                                                placeholder="0"
+                                                value={set.kg}
+                                                onChange={(e) => handleInputChange(exIdx, setIdx, 'kg', e.target.value)}
+                                                className={`w-full text-center bg-transparent font-bold focus:outline-none rounded py-1 transition-colors ${set.completed ? 'text-green-400' : 'text-white bg-gray-800 focus:bg-gray-700'
+                                                    }`}
+                                            />
+                                        </div>
+
+                                        {/* Input REPS */}
+                                        <div className="col-span-2">
+                                            <input
+                                                type="number"
+                                                placeholder="0"
+                                                value={set.reps}
+                                                onChange={(e) => handleInputChange(exIdx, setIdx, 'reps', e.target.value)}
+                                                className={`w-full text-center bg-transparent font-bold focus:outline-none rounded py-1 transition-colors ${set.completed ? 'text-green-400' : 'text-white bg-gray-800 focus:bg-gray-700'
+                                                    }`}
+                                            />
+                                        </div>
+
+                                        {/* Botón Check */}
                                         <div className="col-span-2 flex justify-center">
-                                            <button onClick={() => toggleSetComplete(exIdx, setIdx)} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${set.completed ? 'bg-green-500 text-black shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-gray-800 text-gray-600 hover:bg-gray-700'}`}>
+                                            <button
+                                                onClick={() => toggleSetComplete(exIdx, setIdx)}
+                                                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${set.completed
+                                                        ? 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.4)]'
+                                                        : 'bg-gray-800 text-gray-600 hover:bg-gray-700 hover:text-gray-400'
+                                                    }`}
+                                            >
                                                 <Check size={18} strokeWidth={3} />
                                             </button>
                                         </div>

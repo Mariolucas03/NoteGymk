@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, X, Camera, Sparkles, Loader2, Save, ArrowLeft, Trash2 } from 'lucide-react';
+import { Plus, X, Camera, Sparkles, Loader2, Save, ArrowLeft, Trash2, Edit2, CheckCircle, RotateCw } from 'lucide-react';
 import api from '../../services/api';
 
 export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowToast }) {
@@ -24,7 +24,8 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         } catch (error) { console.error(error); }
     };
 
-    // --- BORRAR COMIDA ---
+    // --- ACCIONES ---
+
     const handleDeleteFood = async (id, e) => {
         e.stopPropagation();
         if (!confirm("¿Borrar de la lista?")) return;
@@ -35,33 +36,25 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         } catch (error) { onShowToast("Error al eliminar", "error"); }
     };
 
-    // --- SELECCIONAR FOTO ---
-    const handleFileSelect = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const objectUrl = URL.createObjectURL(file);
-        setPreviewUrl(objectUrl);
-        setSelectedFile(file);
-        setView('preview');
+    // NUEVO: ACTUALIZAR COMIDA EXISTENTE
+    const handleUpdateFood = async () => {
+        if (!selectedFood || selectedFood._id === 'ai_temp') return;
+        try {
+            await api.put(`/food/saved/${selectedFood._id}`, selectedFood);
+            onShowToast("Comida actualizada");
+            fetchSavedFoods(); // Refrescar lista de fondo
+        } catch (error) { onShowToast("Error al actualizar", "error"); }
     };
 
-    // --- ANALIZAR ---
-    const handleAnalyze = async () => {
-        if (!selectedFile) return;
-        setView('scan');
-        const formData = new FormData();
-        formData.append('image', selectedFile);
-        formData.append('context', userContext);
-
+    const handleSaveToDb = async () => {
+        if (!selectedFood) return;
         try {
-            const res = await api.post('/food/analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-            const aiFood = { ...res.data, _id: 'ai_temp', icon: '✨' };
-            setSelectedFood(aiFood);
-            setView('result');
-        } catch (error) {
-            onShowToast(error.response?.data?.message || "Error al escanear", "error");
-            setView('list');
-        }
+            const res = await api.post('/food/save', selectedFood);
+            onShowToast("Comida guardada");
+            // Convertimos el temporal en guardado para activar modo edición
+            setSelectedFood({ ...res.data, icon: '🍽️' });
+            fetchSavedFoods();
+        } catch (error) { onShowToast("Error al guardar", "error"); }
     };
 
     const handleAdd = async () => {
@@ -79,14 +72,32 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         } catch (error) { onShowToast("Error al añadir", "error"); }
     };
 
-    const handleSaveToDb = async () => {
-        if (!selectedFood) return;
+    // --- LOGICA IA ---
+    const handleFileSelect = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const objectUrl = URL.createObjectURL(file);
+        setPreviewUrl(objectUrl);
+        setSelectedFile(file);
+        setView('preview');
+    };
+
+    const handleAnalyze = async () => {
+        if (!selectedFile) return;
+        setView('scan');
+        const formData = new FormData();
+        formData.append('image', selectedFile);
+        formData.append('context', userContext);
+
         try {
-            const res = await api.post('/food/save', selectedFood);
-            onShowToast("Comida guardada");
-            setSelectedFood({ ...selectedFood, _id: res.data._id, icon: '🍽️' });
-            fetchSavedFoods();
-        } catch (error) { onShowToast("Error al guardar", "error"); }
+            const res = await api.post('/food/analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            const aiFood = { ...res.data, _id: 'ai_temp', icon: '✨' };
+            setSelectedFood(aiFood);
+            setView('result');
+        } catch (error) {
+            onShowToast(error.response?.data?.message || "Error al escanear", "error");
+            setView('list');
+        }
     };
 
     useEffect(() => { return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }; }, [previewUrl]);
@@ -130,7 +141,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                                     >
                                         <div className="flex items-center gap-4">
                                             <span className="text-2xl">{food.icon}</span>
-                                            <div><h4 className="font-bold text-white">{food.name}</h4><p className="text-xs text-gray-500">{food.calories} kcal • {food.servingSize}</p></div>
+                                            <div><h4 className="font-bold text-white">{food.name}</h4><p className="text-xs text-gray-500">{food.calories} kcal</p></div>
                                         </div>
                                         <div className="flex items-center gap-3">
                                             <button onClick={(e) => handleDeleteFood(food._id, e)} className="p-2 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={18} /></button>
@@ -159,6 +170,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                     </div>
                 )}
 
+                {/* VISTA 2.5: LOADING */}
                 {view === 'scan' && (
                     <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
                         <div className="w-24 h-24 bg-blue-600/20 rounded-full flex items-center justify-center mb-4 relative"><Loader2 className="animate-spin text-blue-500" size={48} /><Sparkles className="absolute top-0 right-0 text-yellow-400 animate-ping" /></div>
@@ -166,10 +178,22 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                     </div>
                 )}
 
+                {/* VISTA 3: RESULTADO EDITABLE */}
                 {view === 'result' && selectedFood && (
                     <div className="flex flex-col items-center mt-4 space-y-6 animate-in zoom-in-95">
                         <div className="text-6xl animate-bounce">{selectedFood.icon}</div>
-                        <div className="text-center"><h2 className="text-2xl font-bold text-white">{selectedFood.name}</h2><p className="text-gray-500 text-sm">{selectedFood.calories * quantity} Kcal</p></div>
+
+                        <div className="text-center w-full px-6">
+                            {/* INPUT NOMBRE EDITABLE */}
+                            <input
+                                type="text"
+                                value={selectedFood.name}
+                                onChange={(e) => setSelectedFood({ ...selectedFood, name: e.target.value })}
+                                className="bg-transparent text-2xl font-bold text-white text-center w-full border-b border-gray-700 focus:border-blue-500 outline-none pb-1 placeholder-gray-600"
+                                placeholder="Nombre comida"
+                            />
+                            <p className="text-gray-500 text-sm mt-2">{selectedFood.calories * quantity} Kcal</p>
+                        </div>
 
                         <div className="flex items-center gap-6 bg-gray-800 p-2 rounded-2xl">
                             <button onClick={() => setQuantity(q => Math.max(0.5, q - 0.5))} className="w-12 h-12 bg-gray-700 rounded-xl font-bold text-white text-xl">-</button>
@@ -185,10 +209,17 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                         </div>
 
                         <div className="w-full space-y-3 pt-4">
+                            {/* Botón Principal: AÑADIR A HOY */}
                             <button onClick={handleAdd} className="w-full bg-green-600 hover:bg-green-500 py-4 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"><Plus size={24} /> AÑADIR A HOY</button>
-                            {selectedFood._id === 'ai_temp' && (
-                                <button onClick={handleSaveToDb} className="w-full bg-gray-800 hover:bg-gray-700 py-4 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 border border-gray-700"><Save size={20} /> GUARDAR EN LISTA</button>
-                            )}
+
+                            {/* Botón Secundario: GUARDAR O ACTUALIZAR */}
+                            <div className="flex gap-2">
+                                {selectedFood._id === 'ai_temp' ? (
+                                    <button onClick={handleSaveToDb} className="flex-1 bg-gray-800 hover:bg-gray-700 py-4 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 border border-gray-700"><Save size={20} /> GUARDAR</button>
+                                ) : (
+                                    <button onClick={handleUpdateFood} className="flex-1 bg-blue-900/40 hover:bg-blue-900/60 py-4 rounded-xl text-blue-200 font-bold shadow-lg flex items-center justify-center gap-2 border border-blue-500/30"><RotateCw size={20} /> ACTUALIZAR</button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}

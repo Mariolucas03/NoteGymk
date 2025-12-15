@@ -1,4 +1,3 @@
-// backend/models/User.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -25,7 +24,11 @@ const userSchema = new mongoose.Schema({
     currentXP: { type: Number, default: 0 },
     nextLevelXP: { type: Number, default: 100 },
     coins: { type: Number, default: 0 },
-    lives: { type: Number, default: 100, max: null },
+
+    // --- AQUÍ ESTABA EL ERROR ---
+    // Borra "max: null". Déjalo solo así:
+    lives: { type: Number, default: 100 },
+
     inventory: [{
         item: { type: mongoose.Schema.Types.ObjectId, ref: 'ShopItem' },
         quantity: { type: Number, default: 1 }
@@ -33,19 +36,18 @@ const userSchema = new mongoose.Schema({
 
     // --- WIDGETS ---
     streak: {
-        current: { type: Number, default: 0 },
-        lastLoginDate: { type: Date, default: Date.now }
+        current: { type: Number, default: 1 },
+        lastLogDate: { type: Date, default: Date.now }
     },
     activeWidgets: {
         type: [String],
         default: ['training', 'mood', 'food', 'steps', 'weight', 'sleep', 'streak', 'gains', 'missions', 'sports']
     },
     dailyRewards: {
-        claimedDays: { type: [Number], default: [] }, // Guardamos el número del día: [1, 2, 5...]
-        lastClaimDate: { type: Date } // Para saber si ya reclamó HOY
+        claimedDays: { type: [Number], default: [] },
+        lastClaimDate: { type: Date }
     },
     createdAt: { type: Date, default: Date.now }
 });
 
-// ESTA ES LA LÍNEA CLAVE QUE SUELE FALLAR:
 module.exports = mongoose.model('User', userSchema);

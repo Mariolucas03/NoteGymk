@@ -4,7 +4,7 @@ const DailyLog = require('../models/DailyLog');
 const OpenAI = require("openai");
 const fs = require('fs');
 
-// Configuración OpenRouter (Modelos Gratuitos)
+// Configuración OpenRouter
 const openai = new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
     apiKey: process.env.OPENROUTER_API_KEY,
@@ -16,14 +16,17 @@ const openai = new OpenAI({
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
 
-// --- GESTIÓN DE LOGS DIARIOS ---
+// --- 1. GESTIÓN DE LOGS DIARIOS ---
+
 const getNutritionLog = async (req, res) => {
     try {
         const today = getTodayStr();
+        // CORREGIDO: Filtramos por usuario
         let log = await NutritionLog.findOne({ user: req.user._id, date: today });
+
         if (!log) {
             log = await NutritionLog.create({
-                user: req.user._id,
+                user: req.user._id, // Asignamos usuario al crear
                 date: today,
                 meals: [
                     { name: 'DESAYUNO', foods: [] },
@@ -35,15 +38,21 @@ const getNutritionLog = async (req, res) => {
             });
         }
         res.json(log);
-    } catch (error) { res.status(500).json({ message: 'Error cargando nutrición' }); }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error cargando nutrición' });
+    }
 };
 
 const addMealCategory = async (req, res) => {
     try {
         const { name } = req.body;
         const today = getTodayStr();
+        // CORREGIDO: Filtramos por usuario
         let log = await NutritionLog.findOne({ user: req.user._id, date: today });
+
         if (!log) return res.status(404).json({ message: 'Log no iniciado' });
+
         log.meals.push({ name: name.toUpperCase(), foods: [] });
         await log.save();
         res.json(log);
@@ -90,12 +99,19 @@ const addFoodEntry = async (req, res) => {
             quantity
         };
 
+        // CORREGIDO: Filtramos por usuario
         let log = await NutritionLog.findOne({ user: req.user._id, date: today });
+        if (!log) {
+            // Fallback por seguridad, aunque getNutritionLog debería haberlo creado
+            log = await NutritionLog.create({ user: req.user._id, date: today, meals: [] });
+        }
+
         const mealBox = log.meals.id(mealId);
         if (!mealBox) return res.status(404).json({ message: 'Caja no encontrada' });
 
         mealBox.foods.push(finalEntry);
 
+        // Recalcular totales
         log.totalCalories += finalEntry.calories;
         log.totalProtein += finalEntry.protein;
         log.totalCarbs += finalEntry.carbs;
@@ -103,15 +119,27 @@ const addFoodEntry = async (req, res) => {
         log.totalFiber += finalEntry.fiber;
 
         await log.save();
-        await DailyLog.findOneAndUpdate({ user: req.user._id, date: today }, { totalKcal: log.totalCalories }, { upsert: true });
+
+        // Actualizar DailyLog global (También filtrado por usuario)
+        await DailyLog.findOneAndUpdate(
+            { user: req.user._id, date: today },
+            { totalKcal: log.totalCalories },
+            { upsert: true }
+        );
+
         res.json(log);
     } catch (error) { console.error(error); res.status(500).json({ message: 'Error añadiendo comida' }); }
 };
 
-// --- GESTIÓN DE COMIDAS GUARDADAS ---
+// --- 2. GESTIÓN DE COMIDAS GUARDADAS (PERSONALIZADAS) ---
+
 const getSavedFoods = async (req, res) => {
     try {
-        const foods = await Food.find().sort({ _id: -1 }).limit(50);
+        // CORREGIDO: Solo mostramos las comidas creadas por ESTE usuario
+        // Opcional: Podrías añadir { isGlobal: true } si tuvieras una base de datos común
+        const foods = await Food.find({ user: req.user._id })
+            .sort({ _id: -1 })
+            .limit(50);
         res.json(foods);
     } catch (error) { res.status(500).json({ message: 'Error cargando lista' }); }
 };
@@ -119,8 +147,15 @@ const getSavedFoods = async (req, res) => {
 const saveCustomFood = async (req, res) => {
     try {
         const { name, calories, protein, carbs, fat, fiber, servingSize } = req.body;
+
+        // CORREGIDO: Asignamos el usuario propietario al crear la comida
         const newFood = await Food.create({
-            name, calories, protein, carbs, fat,
+            user: req.user._id, // <--- ESTO EVITA QUE SE COMPARTA EN LA "NEVERA"
+            name,
+            calories,
+            protein,
+            carbs,
+            fat,
             fiber: fiber || 0,
             servingSize: servingSize || '1 ración',
             icon: '🍽️'
@@ -129,25 +164,52 @@ const saveCustomFood = async (req, res) => {
     } catch (error) { res.status(500).json({ message: 'Error guardando comida' }); }
 };
 
-// NUEVO: Borrar comida guardada
 const deleteSavedFood = async (req, res) => {
     try {
-        await Food.findByIdAndDelete(req.params.id);
+        // CORREGIDO: Solo borramos si el ID coincide Y el usuario es el dueño
+        const result = await Food.findOneAndDelete({
+            _id: req.params.id,
+            user: req.user._id
+        });
+
+        if (!result) return res.status(404).json({ message: 'No encontrado o no tienes permiso' });
+
         res.json({ message: 'Alimento eliminado' });
     } catch (error) {
         res.status(500).json({ message: 'Error eliminando alimento' });
     }
 };
 
+const updateSavedFood = async (req, res) => {
+    try {
+        const { name, calories, protein, carbs, fat, fiber } = req.body;
+
+        // CORREGIDO: Solo actualizamos si el usuario es el dueño
+        const updatedFood = await Food.findOneAndUpdate(
+            { _id: req.params.id, user: req.user._id },
+            { name, calories, protein, carbs, fat, fiber },
+            { new: true }
+        );
+        if (!updatedFood) return res.status(404).json({ message: 'Comida no encontrada o no tienes permiso' });
+        res.json(updatedFood);
+    } catch (error) {
+        res.status(500).json({ message: 'Error actualizando comida' });
+    }
+};
+
 const seedFoods = async (req, res) => { res.json({ message: 'Seed desactivado' }); };
 
-// --- IA ROBUSTA (Con Contexto) ---
+// --- 3. IA ROBUSTA (ESCÁNER DE FOTOS) ---
 const analyzeImage = async (req, res) => {
-    const FREE_MODELS = [
+    const VISION_MODELS = [
         "google/gemini-2.0-flash-exp:free",
         "meta-llama/llama-3.2-11b-vision-instruct:free",
         "google/gemini-flash-1.5-exp:free",
-        "qwen/qwen-2-vl-7b-instruct:free"
+        "qwen/qwen-2-vl-7b-instruct:free",
+        "google/gemini-pro-1.5-exp:free",
+        "meta-llama/llama-3.2-90b-vision-instruct:free",
+        "qwen/qwen-2-vl-72b-instruct:free",
+        "google/gemini-flash-1.5-8b-exp:free"
     ];
 
     try {
@@ -166,9 +228,9 @@ const analyzeImage = async (req, res) => {
       Si no es comida: { "error": "No es comida" }.
     `;
 
-        for (const modelName of FREE_MODELS) {
+        for (const modelName of VISION_MODELS) {
             try {
-                console.log(`📡 Probando ${modelName}...`);
+                console.log(`📷 Probando FOTO con ${modelName}...`);
                 const completion = await openai.chat.completions.create({
                     model: modelName,
                     messages: [{
@@ -181,17 +243,16 @@ const analyzeImage = async (req, res) => {
                 });
 
                 const text = completion.choices[0].message.content;
-                console.log("🤖 Respuesta:", text);
-
                 const startIndex = text.indexOf('{');
                 const endIndex = text.lastIndexOf('}');
                 if (startIndex !== -1 && endIndex !== -1) {
                     const jsonStr = text.substring(startIndex, endIndex + 1);
                     foodData = JSON.parse(jsonStr);
+                    console.log(`✅ ÉXITO FOTO con ${modelName}`);
                     break;
                 }
             } catch (error) {
-                console.log(`❌ Falló ${modelName}, siguiente...`);
+                console.log(`❌ Falló FOTO ${modelName}: ${error.message}`);
             }
         }
 
@@ -201,16 +262,106 @@ const analyzeImage = async (req, res) => {
             if (foodData.error) return res.status(400).json({ message: foodData.error });
             return res.json(foodData);
         } else {
-            return res.status(500).json({ message: 'Todos los modelos IA están ocupados. Intenta en 1 min.' });
+            return res.status(503).json({ message: 'Todos los modelos de visión están ocupados. Intenta en 1 min.' });
         }
 
     } catch (error) {
         if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        res.status(500).json({ message: 'Error interno' });
+        res.status(500).json({ message: 'Error interno de imagen' });
+    }
+};
+
+// --- 4. CHAT NUTRICIONISTA IA ---
+const chatMacroCalculator = async (req, res) => {
+    if (!process.env.OPENROUTER_API_KEY) {
+        console.error("❌ ERROR FATAL: No se ha encontrado OPENROUTER_API_KEY");
+        return res.status(500).json({ message: 'Falta configuración de API' });
+    }
+
+    const CHAT_MODELS = [
+        "google/gemini-2.0-flash-exp:free",
+        "meta-llama/llama-3.2-3b-instruct:free",
+        "google/gemini-flash-1.5-exp:free",
+        "meta-llama/llama-3.2-11b-vision-instruct:free",
+        "huggingfaceh4/zephyr-7b-beta:free",
+        "google/gemini-2.0-flash-thinking-exp:free",
+        "liquid/lfm-40b:free",
+        "mistralai/mistral-7b-instruct:free",
+        "microsoft/phi-3-medium-128k-instruct:free",
+        "openchat/openchat-7b:free"
+    ];
+
+    try {
+        const { history } = req.body;
+
+        const systemPrompt = `
+            Eres un nutricionista experto de NoteGymk. Objetivo: calcular TDEE y macros.
+            Necesitas: Edad, Género, Peso, Altura, Actividad, Objetivo.
+            1. Pide datos que falten (sé breve).
+            2. SI TIENES TODO: Calcula y responde SOLO con este JSON:
+               { "done": true, "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "fiber": 0, "message": "Plan listo." }
+            3. SI NO: Responde texto normal (pregunta).
+        `;
+
+        const messages = [
+            { role: "system", content: systemPrompt },
+            ...history
+        ];
+
+        let content = null;
+        let success = false;
+
+        for (const modelName of CHAT_MODELS) {
+            try {
+                console.log(`💬 Intentando CHAT con: ${modelName}...`);
+                const completion = await openai.chat.completions.create({
+                    model: modelName,
+                    messages: messages,
+                    temperature: 0.7
+                });
+
+                content = completion.choices[0].message.content;
+
+                if (content && content.length > 0) {
+                    success = true;
+                    console.log(`✅ ÉXITO CHAT con ${modelName}`);
+                    break;
+                }
+            } catch (error) {
+                console.log(`⚠️ Falló CHAT ${modelName}: ${error.status || error.message}`);
+            }
+        }
+
+        if (!success) {
+            return res.status(503).json({ message: 'Servidores saturados. Revisa tu API Key.' });
+        }
+
+        try {
+            const jsonStart = content.indexOf('{');
+            const jsonEnd = content.lastIndexOf('}');
+
+            if (jsonStart !== -1 && jsonEnd !== -1) {
+                const jsonStr = content.substring(jsonStart, jsonEnd + 1);
+                const data = JSON.parse(jsonStr);
+
+                if (data.done) {
+                    return res.json({ type: 'final', data: data });
+                }
+            }
+        } catch (e) {
+            // No es JSON
+        }
+
+        res.json({ type: 'question', message: content });
+
+    } catch (error) {
+        console.error("Error Crítico Chat:", error);
+        res.status(500).json({ message: 'Error interno del asistente' });
     }
 };
 
 module.exports = {
     getNutritionLog, addFoodEntry, addMealCategory, seedFoods,
-    analyzeImage, getSavedFoods, saveCustomFood, deleteSavedFood
+    analyzeImage, getSavedFoods, saveCustomFood, deleteSavedFood,
+    chatMacroCalculator, updateSavedFood
 };

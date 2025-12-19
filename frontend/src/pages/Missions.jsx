@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
     Trash2, Plus, Zap, Repeat, X, Trophy, ChevronLeft, ChevronRight,
-    Check, Coins, Star, CalendarClock, Target, Gamepad2, Clock
+    Check, Coins, Star, CalendarClock, Target, Gamepad2, Clock, HeartCrack
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -33,8 +33,10 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
     if (dragX > 0) bgClass = 'bg-green-600';
     else if (dragX < 0) bgClass = 'bg-red-600';
 
-    // Cálculo Porcentaje Barra
     const progressPercent = mission.target > 1 ? Math.min((mission.progress / mission.target) * 100, 100) : 0;
+
+    // 🔥 CÁLCULO DE RIESGO (DAÑO POTENCIAL)
+    const potentialDamage = { easy: 5, medium: 3, hard: 1, epic: 0 }[mission.difficulty] || 0;
 
     return (
         <div className="relative w-full h-auto mb-3 select-none isolate overflow-hidden rounded-2xl">
@@ -75,22 +77,34 @@ function MissionCard({ mission, onComplete, onDelete, getDifficultyColor }) {
                     </div>
 
                     <div className="flex gap-2 flex-wrap">
+                        {/* XP */}
                         <div className="flex items-center gap-1.5 bg-blue-600/10 px-2 py-1 rounded-lg border border-blue-500/20">
                             <Star size={12} className="text-blue-400 fill-blue-400" />
-                            <span className="text-xs font-bold text-blue-200">+{mission.xpReward} XP</span>
+                            <span className="text-xs font-bold text-blue-200">+{mission.xpReward}</span>
                         </div>
+
+                        {/* Monedas */}
                         <div className="flex items-center gap-1.5 bg-yellow-600/10 px-2 py-1 rounded-lg border border-yellow-500/20">
                             <Coins size={12} className="text-yellow-400" />
                             <span className="text-xs font-bold text-yellow-200">+{mission.coinReward}</span>
                         </div>
+
+                        {/* Fichas */}
                         <div className="flex items-center gap-1.5 bg-purple-600/10 px-2 py-1 rounded-lg border border-purple-500/20">
                             <Gamepad2 size={12} className="text-purple-400" />
                             <span className="text-xs font-bold text-purple-200">+{mission.gameCoinReward || mission.coinReward * 10}</span>
                         </div>
+
+                        {/* 🔥 NUEVO: INDICADOR DE RIESGO DE VIDA */}
+                        {potentialDamage > 0 && !mission.completed && (
+                            <div className="flex items-center gap-1.5 bg-red-950/40 px-2 py-1 rounded-lg border border-red-500/30 ml-auto sm:ml-0">
+                                <HeartCrack size={12} className="text-red-500" />
+                                <span className="text-xs font-bold text-red-400">-{potentialDamage} HP</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* CORRECCIÓN AQUÍ: Solo mostrar barra si target > 1 (Misiones de repetición) */}
                 {mission.target > 1 && (
                     <div className="mt-4 pointer-events-none">
                         <div className="flex justify-between text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-wide">
@@ -151,15 +165,11 @@ export default function Missions() {
     const getRewardValues = (freq, diff) => {
         const baseXP = 10;
         const baseCoins = 5;
-
         const diffMult = { easy: 1, medium: 2, hard: 3, epic: 5 };
         const freqMult = { daily: 1, weekly: 5, monthly: 15, yearly: 100 };
-
         const m1 = diffMult[diff] || 1;
         const m2 = freqMult[freq] || 1;
-
         const calculatedCoins = baseCoins * m1 * m2;
-
         return {
             xp: baseXP * m1 * m2,
             coins: calculatedCoins,
@@ -167,12 +177,16 @@ export default function Missions() {
         };
     };
 
+    // Calcular daño potencial
+    const getPotentialDamage = (diff) => {
+        const rules = { easy: 5, medium: 3, hard: 1, epic: 0 };
+        return rules[diff] || 0;
+    };
+
     const getPreviewExpirationText = (freq) => {
         const now = new Date();
         const target = new Date();
-
         if (freq === 'daily') return "Hoy a las 00:00";
-
         if (freq === 'weekly') {
             const day = now.getDay();
             const diff = day === 0 ? 0 : 7 - day;
@@ -180,18 +194,17 @@ export default function Missions() {
             const dateStr = `${target.getDate()}/${target.getMonth() + 1}`;
             return `Este Domingo (${dateStr}) a las 00:00`;
         }
-
         if (freq === 'monthly') {
             const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
             const dateStr = `${lastDay.getDate()}/${lastDay.getMonth() + 1}`;
             return `Fin de mes (${dateStr}) a las 00:00`;
         }
-
         if (freq === 'yearly') return `31 de Diciembre a las 00:00`;
         return "";
     };
 
     const previewRewards = getRewardValues(newMission.frequency, newMission.difficulty);
+    const potentialDamage = getPotentialDamage(newMission.difficulty);
     const expirationText = getPreviewExpirationText(newMission.frequency);
 
     const handleComplete = async (mission) => {
@@ -215,7 +228,6 @@ export default function Missions() {
                 localStorage.setItem('user', JSON.stringify(updatedUser));
             }
 
-            // Actualizar lista local
             setMissions(prev => prev.map(m => m._id === mission._id ? res.data.mission : m));
 
             const { xp, coins, gameCoins } = res.data.rewards || { xp: 0, coins: 0, gameCoins: 0 };
@@ -366,24 +378,37 @@ export default function Missions() {
                                 </div>
                             </div>
 
-                            {/* 🔥 PREVIEW DE RECOMPENSAS (CON FICHAS) */}
-                            <div className="space-y-2">
+                            <div className="space-y-2 mt-6">
                                 <div className="bg-black/30 p-3 rounded-xl border border-gray-700 flex justify-between items-center px-4">
                                     <div className="text-xs text-gray-400 font-bold uppercase">Recompensas:</div>
                                     <div className="flex gap-3">
-                                        <span className="flex items-center gap-1 text-blue-400 font-bold text-xs"><Star size={12} /> +{previewRewards.xp} XP</span>
+                                        <span className="flex items-center gap-1 text-blue-400 font-bold text-xs"><Star size={12} /> +{previewRewards.xp}</span>
                                         <span className="flex items-center gap-1 text-yellow-400 font-bold text-xs"><Coins size={12} /> +{previewRewards.coins}</span>
                                         <span className="flex items-center gap-1 text-purple-400 font-bold text-xs"><Gamepad2 size={12} /> +{previewRewards.gameCoins}</span>
                                     </div>
                                 </div>
-                                {/* CADUCIDAD */}
-                                <div className="flex items-center justify-center gap-2 text-[10px] text-gray-500 font-mono">
+
+                                {/* 🔥 PANEL DE RIESGO (NUEVO) */}
+                                <div className="bg-red-950/20 p-3 rounded-xl border border-red-900/30 flex justify-between items-center px-4">
+                                    <div className="text-xs text-red-400/80 font-bold uppercase">Castigo por Fallar:</div>
+                                    <div className="flex gap-3">
+                                        {potentialDamage > 0 ? (
+                                            <span className="flex items-center gap-1 text-red-500 font-bold text-xs">
+                                                <HeartCrack size={12} /> -{potentialDamage} HP
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] text-green-400 font-bold uppercase tracking-wider">¡Sin Riesgo!</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-center gap-2 text-[10px] text-gray-500 font-mono pt-2">
                                     <Clock size={12} />
                                     <span>{expirationText}</span>
                                 </div>
                             </div>
 
-                            <button onClick={handleCreate} className="w-full bg-blue-600 py-4 rounded-xl text-white font-bold shadow-lg active:scale-95 transition-transform">Crear Misión</button>
+                            <button onClick={handleCreate} className="w-full bg-blue-600 py-4 rounded-xl text-white font-bold shadow-lg active:scale-95 transition-transform mt-4">Crear Misión</button>
                         </div>
                     </div>
                 </div>

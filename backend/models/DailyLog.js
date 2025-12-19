@@ -11,18 +11,23 @@ const ExerciseSchema = new mongoose.Schema({
     sets: [SetSchema]
 }, { _id: false });
 
-// 🔥 AQUÍ ESTABA EL PROBLEMA: FALTABAN CAMPOS EN ESTE SUB-ESQUEMA
+// 🔥 ACTUALIZADO: Esquema de Misión Histórica
 const CompletedMissionSchema = new mongoose.Schema({
     title: { type: String, required: true },
 
-    // Estos son los campos que Mongoose estaba ignorando:
+    // Recompensas
     xpReward: { type: Number, default: 0 },
     coinReward: { type: Number, default: 0 },
-    gameCoinReward: { type: Number, default: 0 }, // Fichas
+    gameCoinReward: { type: Number, default: 0 },
 
-    frequency: { type: String }, // daily, weekly...
-    difficulty: { type: String }, // easy, hard...
-    type: { type: String } // habit, temporal
+    // Meta-datos
+    frequency: { type: String },
+    difficulty: { type: String },
+    type: { type: String },
+
+    // 🔥 NUEVOS CAMPOS PARA FALLOS
+    failed: { type: Boolean, default: false }, // ¿Fue completada o fallida?
+    hpLoss: { type: Number, default: 0 }       // ¿Cuánta vida costó?
 }, { _id: false });
 
 // Esquemas de deporte y gym...
@@ -70,13 +75,13 @@ const dailyLogSchema = new mongoose.Schema({
     missionStats: {
         completed: { type: Number, default: 0 },
         total: { type: Number, default: 3 },
-        listCompleted: [CompletedMissionSchema] // Usamos el esquema actualizado
+        listCompleted: [CompletedMissionSchema] // Array mixto (Completadas + Fallidas)
     },
 
     gains: {
         coins: { type: Number, default: 0 },
         xp: { type: Number, default: 0 },
-        lives: { type: Number, default: 0 }
+        lives: { type: Number, default: 0 } // Vidas perdidas ese día (opcional)
     }
 
 }, { timestamps: true });

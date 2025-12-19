@@ -478,6 +478,10 @@ export default function Profile() {
             )}
 
             {/* MODAL HISTORIAL DE MISIONES */}
+            // ... imports (Asegúrate de importar HeartCrack o Heart si los usas)
+            // Reemplazar la parte del modal de misiones con esto:
+
+            {/* MODAL HISTORIAL DE MISIONES */}
             {selectedMissions && (
                 <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative flex flex-col max-h-[80vh]">
@@ -488,11 +492,21 @@ export default function Profile() {
                         <div className="space-y-3 overflow-y-auto custom-scrollbar pr-1">
                             {selectedMissions.listCompleted && selectedMissions.listCompleted.length > 0 ? (
                                 selectedMissions.listCompleted.map((m, idx) => (
-                                    <div key={idx} className="bg-gray-950 p-4 rounded-xl border border-gray-800/50 flex flex-col gap-2 relative overflow-hidden group">
+                                    <div key={idx} className={`p-4 rounded-xl border flex flex-col gap-2 relative overflow-hidden group ${m.failed
+                                            ? 'bg-red-950/30 border-red-500/30' // Estilo Fallida
+                                            : 'bg-gray-950 border-gray-800/50' // Estilo Completada
+                                        }`}>
 
-                                        {/* Título y Tipo */}
+                                        {/* Cabecera */}
                                         <div className="flex justify-between items-start relative z-10">
-                                            <span className="text-white text-sm font-bold block line-clamp-2">{m.title}</span>
+                                            <span className={`text-sm font-bold block line-clamp-2 ${m.failed ? 'text-red-200 line-through' : 'text-white'}`}>
+                                                {m.title}
+                                            </span>
+                                            {m.failed ? (
+                                                <span className="text-[9px] font-black bg-red-500 text-white px-1.5 py-0.5 rounded uppercase">FAIL</span>
+                                            ) : (
+                                                <CheckCircle size={16} className="text-green-500" />
+                                            )}
                                         </div>
 
                                         {/* Etiquetas */}
@@ -500,61 +514,48 @@ export default function Profile() {
                                             <span className="text-[9px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded border border-gray-700 uppercase font-bold">
                                                 {m.frequency === 'daily' ? 'Diaria' : m.frequency || 'Misión'}
                                             </span>
-                                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${m.difficulty === 'hard' ? 'text-orange-400 border-orange-500/30 bg-orange-500/10' :
-                                                    m.difficulty === 'epic' ? 'text-purple-400 border-purple-500/30 bg-purple-500/10' :
-                                                        'text-green-400 border-green-500/30 bg-green-500/10'
-                                                }`}>
+                                            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border text-gray-400 border-gray-700">
                                                 {m.difficulty || 'Normal'}
                                             </span>
-                                            {m.type === 'temporal' && (
-                                                <span className="text-[9px] bg-blue-900/30 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded uppercase font-bold">
-                                                    Única
-                                                </span>
-                                            )}
                                         </div>
 
-                                        {/* Recompensas (AQUÍ ES DONDE DEBEN SALIR) */}
-                                        <div className="flex gap-3 mt-1 pt-2 border-t border-gray-800 relative z-10">
+                                        {/* Footer: Recompensas o Castigo */}
+                                        <div className={`flex gap-3 mt-1 pt-2 border-t relative z-10 ${m.failed ? 'border-red-500/20' : 'border-gray-800'}`}>
 
-                                            {/* XP */}
-                                            {(m.xpReward > 0) && (
-                                                <div className="flex items-center gap-1">
-                                                    <Star size={10} className="text-blue-400 fill-blue-400/20" />
-                                                    <span className="text-[10px] font-bold text-blue-200">+{m.xpReward} XP</span>
+                                            {m.failed ? (
+                                                /* MODO FALLIDA: Muestra Vida Perdida */
+                                                <div className="flex items-center gap-1 w-full justify-center">
+                                                    <HeartCrack size={12} className="text-red-500 fill-red-500" />
+                                                    <span className="text-xs font-bold text-red-400">
+                                                        {m.hpLoss ? `-${m.hpLoss} HP` : 'Sin castigo'}
+                                                    </span>
                                                 </div>
-                                            )}
-
-                                            {/* Monedas */}
-                                            {(m.coinReward > 0) && (
-                                                <div className="flex items-center gap-1">
-                                                    <Coins size={10} className="text-yellow-400 fill-yellow-400/20" />
-                                                    <span className="text-[10px] font-bold text-yellow-200">+{m.coinReward}</span>
-                                                </div>
-                                            )}
-
-                                            {/* Fichas (GameCoins) */}
-                                            {(m.gameCoinReward > 0) && (
-                                                <div className="flex items-center gap-1">
-                                                    <Gamepad2 size={10} className="text-purple-400 fill-purple-400/20" />
-                                                    <span className="text-[10px] font-bold text-purple-200">+{m.gameCoinReward}</span>
-                                                </div>
+                                            ) : (
+                                                /* MODO COMPLETADA: Muestra Premios */
+                                                <>
+                                                    {(m.xpReward > 0) && (
+                                                        <div className="flex items-center gap-1"><Star size={10} className="text-blue-400" /><span className="text-[10px] font-bold text-blue-200">+{m.xpReward} XP</span></div>
+                                                    )}
+                                                    {(m.coinReward > 0) && (
+                                                        <div className="flex items-center gap-1"><Coins size={10} className="text-yellow-400" /><span className="text-[10px] font-bold text-yellow-200">+{m.coinReward}</span></div>
+                                                    )}
+                                                    {(m.gameCoinReward > 0) && (
+                                                        <div className="flex items-center gap-1"><Gamepad2 size={10} className="text-purple-400" /><span className="text-[10px] font-bold text-purple-200">+{m.gameCoinReward}</span></div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
-
-                                        {/* Decoración fondo */}
-                                        <CheckCircle size={80} className="text-green-900/10 absolute -right-4 -bottom-4 z-0" />
                                     </div>
                                 ))
                             ) : (
                                 <div className="text-center py-6 bg-gray-950 rounded-xl border border-gray-800 text-gray-500 text-sm">
-                                    <p>No hay misiones completadas este día.</p>
+                                    <p>No hay registro de misiones.</p>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
             )}
-
             {selectedFood && (
                 <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative flex flex-col">

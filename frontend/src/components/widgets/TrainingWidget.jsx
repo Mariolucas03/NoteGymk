@@ -1,18 +1,22 @@
 import React from 'react';
-import { Dumbbell, CheckCircle, ChevronRight, Clock } from 'lucide-react';
+import { Dumbbell, CheckCircle, ChevronRight, Clock, Layers } from 'lucide-react';
 
-export default function TrainingWidget({ workout }) {
+export default function TrainingWidget({ workouts = [] }) {
+    // Aseguramos que sea array
+    const safeWorkouts = Array.isArray(workouts) ? workouts : [];
+    const count = safeWorkouts.length;
+    const lastWorkout = count > 0 ? safeWorkouts[count - 1] : null;
 
     // --- ESTADO 1: NO HAY ENTRENAMIENTO (PENDIENTE) ---
-    if (!workout) {
+    if (count === 0) {
         return (
-            <div className="col-span-2 bg-gray-900 border border-gray-800 rounded-2xl p-4 h-40 relative overflow-hidden flex flex-col justify-between shadow-lg cursor-pointer hover:border-blue-500/50 transition-all group">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 h-40 relative overflow-hidden flex flex-col justify-between shadow-lg cursor-pointer hover:border-blue-500/50 transition-all group">
                 <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                     <Dumbbell size={48} />
                 </div>
                 <div className="flex items-center gap-2 text-gray-400 mb-1 z-10 group-hover:text-blue-400 transition-colors">
                     <Dumbbell size={18} />
-                    <span className="text-xs font-bold uppercase">Entrenamiento</span>
+                    <span className="text-xs font-bold uppercase">Gimnasio</span>
                 </div>
                 <div className="z-10">
                     <span className="text-3xl font-bold text-gray-500 group-hover:text-gray-300 transition-colors">
@@ -27,35 +31,41 @@ export default function TrainingWidget({ workout }) {
         );
     }
 
-    // --- ESTADO 2: ENTRENAMIENTO COMPLETADO (LIMPIO) ---
+    // --- ESTADO 2: ENTRENAMIENTOS COMPLETADOS ---
     return (
-        <div className="col-span-2 bg-gradient-to-br from-green-900/40 to-gray-900 border border-green-500/30 rounded-2xl p-4 h-40 relative overflow-hidden flex flex-col justify-between shadow-lg cursor-pointer hover:border-green-500/60 transition-all group">
+        <div className="bg-gradient-to-br from-green-900/40 to-gray-900 border border-green-500/30 rounded-2xl p-4 h-40 relative overflow-hidden flex flex-col justify-between shadow-lg cursor-pointer hover:border-green-500/60 transition-all group">
 
             <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                 <CheckCircle size={48} />
             </div>
 
-            <div className="z-10 flex items-center gap-2 mb-1">
-                <div className="bg-green-500/20 p-1 rounded-md">
-                    <CheckCircle size={14} className="text-green-400" />
+            <div className="z-10 flex justify-between items-start">
+                <div className="flex items-center gap-2 mb-1">
+                    <div className="bg-green-500/20 p-1 rounded-md">
+                        <CheckCircle size={14} className="text-green-400" />
+                    </div>
+                    <span className="text-green-400 text-xs font-bold uppercase tracking-wider">Gym</span>
                 </div>
-                <span className="text-green-400 text-xs font-bold uppercase tracking-wider">Completado</span>
+                {count > 1 && (
+                    <span className="bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
+                        <Layers size={10} /> x{count}
+                    </span>
+                )}
             </div>
 
             <div className="z-10">
-                <h3 className="text-2xl font-bold text-white leading-tight line-clamp-1">
-                    {workout.name || workout.routineName}
+                <h3 className="text-xl font-bold text-white leading-tight line-clamp-2">
+                    {lastWorkout.name}
                 </h3>
-
-                {/* AQUI QUITAMOS LA XP Y MONEDAS, SOLO TIEMPO */}
                 <p className="text-gray-400 text-xs flex items-center gap-3 mt-1 font-medium">
                     <span className="flex items-center gap-1">
-                        <Clock size={12} /> {Math.floor((workout.duration || 0) / 60)} min
+                        <Clock size={12} /> {Math.floor((lastWorkout.duration || 0) / 60)} min
                     </span>
                 </p>
             </div>
 
-            <div className="z-10 flex justify-end">
+            <div className="z-10 flex justify-between items-center text-[10px] text-gray-500">
+                <span>{count > 1 ? 'Ver todos' : 'Ver detalle'}</span>
                 <div className="bg-black/30 p-2 rounded-full group-hover:bg-black/50 transition-colors">
                     <ChevronRight size={16} className="text-green-400" />
                 </div>

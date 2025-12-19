@@ -10,7 +10,7 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100 }) {
     const strokeColor = isOverLimit ? "#ef4444" : "#3b82f6";
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 h-full min-h-[160px] flex flex-col justify-between relative shadow-lg group hover:border-blue-500/50 transition-all">
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 h-40 min-h-[160px] flex flex-col justify-between relative shadow-lg group hover:border-blue-500/50 transition-all">
             <div className="flex justify-between items-start z-10">
                 <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-blue-400 transition-colors">
                     <Utensils size={12} /> Dieta
@@ -20,7 +20,7 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100 }) {
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="relative w-24 h-24 flex items-center justify-center">
                     {/* Fondo */}
-                    <svg className="transform -rotate-90 w-full h-full">
+                    <svg className="transform -rotate-90 w-full h-40">
                         <circle cx="50%" cy="50%" r={radius} stroke="#1f2937" strokeWidth="8" fill="transparent" />
                         {/* Progreso */}
                         <circle

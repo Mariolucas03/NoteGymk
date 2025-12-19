@@ -5,17 +5,32 @@ const User = require('../models/User');
 const protect = asyncHandler(async (req, res, next) => {
     let token;
 
-    // Verificar si hay header de autorización que empiece por Bearer
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
-            // Obtener el token del header (Bearer token_aqui)
+            // Obtener el token del header
             token = req.headers.authorization.split(' ')[1];
 
-            // Verificar token
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_temporal');
+            // Verificación de seguridad extra
+            if (!process.env.JWT_SECRET) {
+                throw new Error('FATAL: JWT_SECRET no definido en entorno');
+            }
 
-            // Obtener usuario del token (sin la contraseña)
-            req.user = await User.findById(decoded.id).select('-password');
+            // Verificar token
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+            // Obtener el usuario del token (buscando en BD para tener datos frescos)
+            // Nota: decoded.id o decoded.user.id depende de cómo firmaste el token en authController.
+            // Generalmente es decoded.id si firmaste { id: user._id }
+            // O decoded.user.id si firmaste { user: { id: user._id } }
+            // Aquí asumimos que el ID está directo o dentro de user:
+            const userId = decoded.id || decoded.user?.id || decoded.user;
+
+            req.user = await User.findById(userId).select('-password');
+
+            if (!req.user) {
+                res.status(401);
+                throw new Error('Usuario no encontrado');
+            }
 
             next();
         } catch (error) {
@@ -31,4 +46,5 @@ const protect = asyncHandler(async (req, res, next) => {
     }
 });
 
-module.exports = { protect };
+// ⚠️ IMPORTANTE: Exportamos la función directamente para que coincida con tu require
+module.exports = protect;

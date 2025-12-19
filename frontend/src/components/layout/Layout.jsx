@@ -1,51 +1,52 @@
 import { Outlet, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Header from './Header';
-import Footer from './Footer'; // <--- 1. IMPORTANTE: Importamos el Footer
+import Footer from './Footer';
 import api from '../../services/api';
+import RedemptionScreen from './RedemptionScreen'; // <--- 1. IMPORTAR PANTALLA ROJA
 
 export default function Layout() {
     const navigate = useNavigate();
 
-    // 1. INICIALIZACIÓN INTELIGENTE:
-    // Al cargar la página, intentamos leer el usuario guardado en el navegador.
     const [user, setUser] = useState(() => {
-        const savedUser = localStorage.getItem('user');
-        return savedUser ? JSON.parse(savedUser) : null;
+        try {
+            const savedUser = localStorage.getItem('user');
+            return savedUser ? JSON.parse(savedUser) : null;
+        } catch (e) {
+            console.error("Error parseando usuario local:", e);
+            return null;
+        }
     });
 
-    // 2. SINCRONIZACIÓN EN SEGUNDO PLANO:
     useEffect(() => {
         const fetchUserData = async () => {
             try {
-                // Usamos /daily porque devuelve el usuario actualizado (monedas, nivel, XP)
                 const res = await api.get('/daily');
-
-                if (res.data.user) {
-                    // Mezclamos lo que teníamos con lo nuevo por seguridad
-                    const updatedUser = { ...user, ...res.data.user };
-
-                    setUser(updatedUser);
-                    // Guardamos en memoria local para la próxima vez
+                setUser((prevUser) => {
+                    const safePrev = prevUser || {};
+                    const updatedUser = {
+                        ...safePrev,
+                        ...(res.data.user || {}),
+                        dailyLog: res.data
+                    };
                     localStorage.setItem('user', JSON.stringify(updatedUser));
-                }
+                    return updatedUser;
+                });
             } catch (error) {
-                console.error("Error actualizando usuario en Layout:", error);
-                // Si el token falló, podrías redirigir al login:
-                // if (error.response?.status === 401) logout();
+                console.error("Error sincronizando:", error);
+                if (error.response && error.response.status === 401) {
+                    localStorage.removeItem('user');
+                    localStorage.removeItem('token');
+                    navigate('/login');
+                }
             }
         };
 
-        // Solo llamamos a la API si tenemos un token (estamos logueados)
         const token = localStorage.getItem('token');
-        if (token) {
-            fetchUserData();
-        } else {
-            navigate('/login');
-        }
-    }, []);
+        if (token) fetchUserData();
 
-    // Función para cerrar sesión limpia
+    }, [navigate]);
+
     const logout = () => {
         setUser(null);
         localStorage.removeItem('user');
@@ -53,28 +54,32 @@ export default function Layout() {
         navigate('/login');
     };
 
-    // Función auxiliar para que los hijos (Home, Games...) puedan actualizar el usuario
-    const handleUserUpdate = (newData) => {
+    // useCallback PARA EVITAR BUCLES
+    const handleUserUpdate = useCallback((newData) => {
         setUser((prev) => {
             const updated = { ...prev, ...newData };
             localStorage.setItem('user', JSON.stringify(updated));
             return updated;
         });
-    };
+    }, []);
+
+    // --- 2. LÓGICA DE GAME OVER (EL MURO) ---
+    // Si el usuario existe, tiene stats y su vida es 0 o menos... ¡BLOQUEO TOTAL!
+    if (user && user.stats && user.stats.hp <= 0) {
+        // Renderizamos SOLO la pantalla de redención. 
+        // Pasamos handleUserUpdate como setUser para poder revivir.
+        return <RedemptionScreen user={user} setUser={handleUserUpdate} />;
+    }
 
     return (
-        // Usamos pb-24 (padding bottom) para que el Footer no tape el contenido final
-        <div className="min-h-screen bg-black text-white pb-24 font-sans relative">
+        <div className="min-h-screen bg-black text-white pb-24 font-sans relative flex flex-col">
+            {/* 3. Pasamos setUser al Header para que funcione el HealthWidget (guardar misión) */}
+            <Header user={user} setUser={handleUserUpdate} logout={logout} />
 
-            {/* El Header siempre recibe el usuario actualizado */}
-            <Header user={user} logout={logout} />
-
-            <main className="pt-24 px-4 max-w-md mx-auto">
-                {/* Pasamos 'user' y 'setUser' a todas las páginas */}
+            <main className="flex-grow pt-20 px-4 max-w-md mx-auto w-full">
                 <Outlet context={{ user, setUser: handleUserUpdate }} />
             </main>
 
-            {/* --- 2. AQUÍ PONEMOS EL FOOTER --- */}
             <Footer />
         </div>
     );

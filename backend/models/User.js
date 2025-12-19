@@ -1,37 +1,38 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-    username: {
-        type: String,
-        required: [true, 'El nombre es obligatorio'],
-        unique: true,
-        trim: true
-    },
-    email: {
-        type: String,
-        required: [true, 'El email es obligatorio'],
-        unique: true,
-        lowercase: true,
-        trim: true
-    },
-    password: {
-        type: String,
-        required: [true, 'La contraseña es obligatoria']
+    username: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+
+    // --- ESTADÍSTICAS RPG ---
+    stats: {
+        level: { type: Number, default: 1 },
+        currentXP: { type: Number, default: 0 },
+        nextLevelXP: { type: Number, default: 100 },
+        coins: { type: Number, default: 50 },
+
+        // 🔥 NUEVA MONEDA (Fichas para juegos)
+        gameCoins: { type: Number, default: 500 },
+
+        hp: { type: Number, default: 100 },
+        maxHp: { type: Number, default: 100 }
     },
 
-    // --- STATS RPG ---
+    // Alias en raíz para compatibilidad
+    coins: { type: Number, default: 50 },
     level: { type: Number, default: 1 },
     currentXP: { type: Number, default: 0 },
     nextLevelXP: { type: Number, default: 100 },
-    coins: { type: Number, default: 50 },
     lives: { type: Number, default: 100 },
+
+    redemptionMission: { type: String, default: null },
 
     inventory: [{
         item: { type: mongoose.Schema.Types.ObjectId, ref: 'ShopItem' },
         quantity: { type: Number, default: 1 }
     }],
 
-    // --- CONFIGURACIÓN DE OBJETIVOS (NUEVO) ---
     macros: {
         calories: { type: Number, default: 2100 },
         protein: { type: Number, default: 150 },
@@ -40,20 +41,17 @@ const userSchema = new mongoose.Schema({
         fiber: { type: Number, default: 30 }
     },
 
-    // --- WIDGETS ---
     streak: {
         current: { type: Number, default: 1 },
         lastLogDate: { type: Date, default: Date.now }
     },
-    activeWidgets: {
-        type: [String],
-        default: ['training', 'mood', 'food', 'steps', 'weight', 'sleep', 'streak', 'gains', 'missions', 'sports']
-    },
+
     dailyRewards: {
         claimedDays: { type: [Number], default: [] },
         lastClaimDate: { type: Date }
-    },
-    createdAt: { type: Date, default: Date.now }
+    }
+}, {
+    timestamps: true
 });
 
 module.exports = mongoose.model('User', userSchema);

@@ -1,15 +1,14 @@
-import { Flame, CalendarDays, Trophy } from 'lucide-react';
+import { Flame, CalendarDays, Trophy, AlertTriangle } from 'lucide-react'; // Añadir AlertTriangle
 
 export default function StreakWidget({ streak = 1 }) {
-    // Aseguramos que nunca sea undefined
     const currentStreak = streak || 1;
 
-    // Lógica visual: Fuego cambia de color/intensidad según la racha
-    const isEpic = currentStreak >= 30; // Fuego azul/morado
-    const isOnFire = currentStreak >= 7; // Fuego naranja intenso
-    const isWarmingUp = currentStreak >= 3; // Fuego amarillo
+    // Lógica visual
+    const isEpic = currentStreak >= 30;
+    const isOnFire = currentStreak >= 7;
+    const isWarmingUp = currentStreak >= 3;
+    const isReset = currentStreak === 1; // Nueva condición: Acaba de empezar/reiniciar
 
-    // Colores dinámicos
     let fireColor = "text-gray-600";
     let glowColor = "";
     let borderColor = "border-gray-800";
@@ -51,22 +50,26 @@ export default function StreakWidget({ streak = 1 }) {
             {/* Mensaje Motivacional */}
             <div className="z-10 bg-black/20 p-2 rounded-lg backdrop-blur-sm border border-white/5">
                 <p className="text-[10px] text-gray-300 font-medium flex items-center gap-2">
-                    <CalendarDays size={12} className="text-gray-500" />
-                    {currentStreak === 1 ? "¡El primer paso cuenta!" :
-                        currentStreak < 7 ? "¡Sigue así, vas genial!" :
-                            currentStreak < 30 ? "¡Eres imparable!" :
-                                "¡Nivel Dios alcanzado!"}
+                    {isReset ? (
+                        <>
+                            <CalendarDays size={12} className="text-blue-400" />
+                            ¡Hoy empieza todo!
+                        </>
+                    ) : (
+                        <>
+                            <CalendarDays size={12} className="text-gray-500" />
+                            {currentStreak < 7 ? "¡Sigue así, vas genial!" :
+                                currentStreak < 30 ? "¡Eres imparable!" : "¡Nivel Dios!"}
+                        </>
+                    )}
                 </p>
             </div>
 
             {/* --- EFECTOS DE FONDO --- */}
-
-            {/* Fuego Gigante de Fondo */}
             <div className={`absolute -right-4 -bottom-6 transition-all duration-700 group-hover:scale-110 opacity-10 pointer-events-none`}>
                 <Flame size={110} className={isEpic ? 'text-purple-600' : isOnFire ? 'text-orange-600' : 'text-gray-500'} fill="currentColor" />
             </div>
 
-            {/* Partículas (Brillo) */}
             {isOnFire && (
                 <div className="absolute inset-0 bg-gradient-to-t from-orange-500/5 to-transparent pointer-events-none" />
             )}

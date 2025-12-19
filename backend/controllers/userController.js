@@ -1,127 +1,191 @@
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
+const levelService = require('../services/levelService');
 
-// @desc    Registrar nuevo usuario
-const registerUser = asyncHandler(async (req, res) => {
-    const { username, email, password } = req.body;
-    if (!username || !email || !password) {
-        res.status(400); throw new Error('Por favor rellena todos los campos');
-    }
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-        res.status(400); throw new Error('El usuario ya existe');
-    }
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    const user = await User.create({
-        username, email, password: hashedPassword,
-        coins: 0, level: 1, currentXP: 0, nextLevelXP: 100,
-        streak: { current: 1, lastLogDate: new Date() },
-        lives: 100
-    });
-    if (user) {
-        res.status(201).json({
-            _id: user.id, username: user.username, email: user.email,
-            token: generateToken(user._id), coins: user.coins, level: user.level,
-            macros: user.macros // Devolvemos macros
-        });
-    } else {
-        res.status(400); throw new Error('Datos de usuario no válidos');
-    }
-});
-
-// @desc    Login
-const loginUser = asyncHandler(async (req, res) => {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (user && (await bcrypt.compare(password, user.password))) {
-        res.json({
-            _id: user.id, username: user.username, email: user.email,
-            token: generateToken(user._id), coins: user.coins, level: user.level,
-            currentXP: user.currentXP, nextLevelXP: user.nextLevelXP,
-            streak: user.streak, lives: user.lives,
-            macros: user.macros // Devolvemos macros
-        });
-    } else {
-        res.status(401); throw new Error('Credenciales incorrectas');
-    }
-});
-
-// @desc    Obtener mis datos
+// @desc    Obtener datos del usuario actual (Con auto-reparación de nivel)
+// @route   GET /api/users/me
 const getMe = asyncHandler(async (req, res) => {
-    res.status(200).json(req.user);
+    // 1. Ejecutar reparación de nivel por si la XP está desbordada
+    // Esto soluciona el bug visual de "2000/600 XP"
+    const repairedUser = await levelService.ensureLevelConsistency(req.user._id);
+
+    // 2. Si hubo reparación usamos ese usuario, si no, buscamos el normal con populate
+    let user = repairedUser;
+
+    if (!user) {
+        user = await User.findById(req.user._id);
+    }
+
+    // Aseguramos el populate del inventario en ambos casos
+    // (Si vino de ensureLevelConsistency puede que no tenga el populate hecho)
+    await user.populate('inventory.item');
+
+    // Quitamos el password por seguridad antes de enviar
+    user.password = undefined;
+
+    if (user) {
+        res.status(200).json(user);
+    } else {
+        res.status(404);
+        throw new Error('Usuario no encontrado');
+    }
 });
 
-// @desc    Actualizar Macros y Calorías (NUEVO)
+// @desc    Actualizar objetivos nutricionales (Macros)
 // @route   PUT /api/users/macros
 const updateMacros = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id);
-    if (user) {
-        user.macros = {
-            calories: req.body.calories || user.macros.calories,
-            protein: req.body.protein || user.macros.protein,
-            carbs: req.body.carbs || user.macros.carbs,
-            fat: req.body.fat || user.macros.fat,
-            fiber: req.body.fiber || user.macros.fiber
-        };
-        const updatedUser = await user.save();
 
-        // Devolvemos el usuario completo actualizado
-        res.json(updatedUser);
-    } else {
-        res.status(404); throw new Error('Usuario no encontrado');
+    if (!user) {
+        res.status(404);
+        throw new Error('Usuario no encontrado');
     }
+
+    const { calories, protein, carbs, fat, fiber } = req.body;
+
+    // Si el usuario es antiguo y no tiene 'macros', lo inicializamos
+    if (!user.macros) {
+        user.macros = {
+            calories: 2000,
+            protein: 150,
+            carbs: 200,
+            fat: 70,
+            fiber: 30
+        };
+    }
+
+    // Asignación explícita para evitar errores con subdocumentos Mongoose
+    if (calories !== undefined) user.macros.calories = Number(calories);
+    if (protein !== undefined) user.macros.protein = Number(protein);
+    if (carbs !== undefined) user.macros.carbs = Number(carbs);
+    if (fat !== undefined) user.macros.fat = Number(fat);
+    if (fiber !== undefined) user.macros.fiber = Number(fiber);
+
+    // Forzamos a Mongoose a saber que hemos tocado este objeto
+    user.markModified('macros');
+
+    const updatedUser = await user.save();
+
+    res.status(200).json(updatedUser);
 });
 
 // @desc    Reclamar recompensa diaria
+// @route   POST /api/users/claim-daily
 const claimDailyReward = asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user.id);
-    if (!user) { res.status(404); throw new Error('Usuario no encontrado'); }
-    const creationDate = new Date(user.createdAt);
-    const now = new Date();
-    const currentDay = Math.ceil(Math.abs(now - creationDate) / (1000 * 60 * 60 * 24));
+    const user = await User.findById(req.user._id);
 
-    if (user.dailyRewards && user.dailyRewards.lastClaimDate) {
+    if (!user) {
+        res.status(404);
+        throw new Error('Usuario no encontrado');
+    }
+
+    // 1. VALIDACIÓN DE FECHA
+    const today = new Date();
+    const todayStr = today.toDateString();
+
+    if (!user.dailyRewards) {
+        user.dailyRewards = { claimedDays: [], lastClaimDate: null };
+    }
+
+    if (user.dailyRewards.lastClaimDate) {
         const lastClaim = new Date(user.dailyRewards.lastClaimDate);
-        if (lastClaim.getDate() === now.getDate() && lastClaim.getMonth() === now.getMonth() && lastClaim.getFullYear() === now.getFullYear()) {
-            res.status(400); throw new Error('Ya has reclamado tu recompensa de hoy');
+        if (lastClaim.toDateString() === todayStr) {
+            res.status(400);
+            throw new Error('¡Ya has reclamado tu recompensa de hoy! Vuelve mañana.');
         }
     }
-    if (!user.dailyRewards) { user.dailyRewards = { claimedDays: [], lastClaimDate: null }; }
 
-    const rewardCoins = 50; const rewardXP = 20;
-    user.coins += rewardCoins; user.currentXP += rewardXP;
-    user.dailyRewards.claimedDays.push(currentDay); user.dailyRewards.lastClaimDate = now;
+    // 2. LÓGICA DE RACHA (Día 1 a 7)
+    const currentLength = user.dailyRewards.claimedDays.length;
+    const currentDay = (currentLength % 7) + 1;
 
-    while (user.currentXP >= user.nextLevelXP) {
-        user.currentXP -= user.nextLevelXP; user.level += 1; user.nextLevelXP = Math.floor(user.nextLevelXP * 1.5); user.lives = 100;
+    // 3. CALCULAR PREMIO
+    let rewardCoins = 50 + (currentDay * 10);
+    let rewardXP = 20 + (currentDay * 5);
+
+    if (currentDay === 7) {
+        rewardCoins += 150;
+        rewardXP += 100;
     }
+
+    // 4. GUARDAR ESTADO
+    user.dailyRewards.claimedDays.push(currentDay);
+    user.dailyRewards.lastClaimDate = today;
     await user.save();
-    res.status(200).json({ message: 'Recompensa reclamada', coins: user.coins, currentXP: user.currentXP, level: user.level, nextLevelXP: user.nextLevelXP, dailyRewards: user.dailyRewards });
+
+    // 5. APLICAR RECOMPENSAS
+    const result = await levelService.addRewards(user._id, rewardXP, rewardCoins, 0);
+
+    // 6. RESPONDER
+    res.status(200).json({
+        message: `¡Has reclamado el Día ${currentDay}!`,
+        ...result.user.toObject(),
+        dailyRewards: user.dailyRewards,
+        rewardReceived: { xp: rewardXP, coins: rewardCoins }
+    });
 });
 
-// @desc    Add game reward
+// @desc    Añadir recompensa genérica (Juegos, Ruleta, etc.)
+// @route   POST /api/users/reward
 const addGameReward = asyncHandler(async (req, res) => {
-    try {
-        const { coins, xp, lives } = req.body;
-        const user = await User.findById(req.user._id);
-        if (!user) { res.status(404); throw new Error('Usuario no encontrado'); }
+    const { coins, xp, gameCoins } = req.body;
 
-        if (coins) user.coins += Number(coins);
-        if (xp) user.currentXP += Number(xp);
-        if (lives) user.lives += Number(lives);
+    const result = await levelService.addRewards(
+        req.user._id,
+        Number(xp || 0),
+        Number(coins || 0),     // Monedas Reales
+        Number(gameCoins || 0)  // Fichas Virtuales
+    );
 
-        let leveledUp = false;
-        while (user.currentXP >= user.nextLevelXP) {
-            user.currentXP -= user.nextLevelXP; user.level += 1; user.nextLevelXP = Math.floor(user.nextLevelXP * 1.5); leveledUp = true; user.lives = 100;
-        }
-        await user.save();
-        res.json({ user: { _id: user._id, username: user.username, email: user.email, coins: user.coins, level: user.level, currentXP: user.currentXP, nextLevelXP: user.nextLevelXP, lives: user.lives, macros: user.macros }, leveledUp });
-    } catch (error) { console.error(error); res.status(500).json({ message: 'Error procesando recompensa' }); }
+    res.status(200).json({
+        success: true,
+        user: result.user,
+        leveledUp: result.leveledUp,
+        newBalance: result.user.coins,
+        newGameCoins: result.user.stats.gameCoins
+    });
 });
 
-const generateToken = (id) => { return jwt.sign({ id }, process.env.JWT_SECRET || 'secret_temporal', { expiresIn: '30d' }); };
+// Mantenemos las funciones de redención y revive aquí para no romper rutas
+// (Aunque idealmente deberían estar separadas, las dejamos para compatibilidad)
+const setRedemptionMission = asyncHandler(async (req, res) => {
+    const { mission } = req.body;
+    if (!mission || mission.trim() === '') {
+        return res.status(400).json({ message: "La misión es obligatoria" });
+    }
+    const user = await User.findById(req.user._id);
+    if (user.redemptionMission) {
+        return res.status(400).json({ message: "Pacto ya sellado." });
+    }
+    user.redemptionMission = mission;
+    await user.save();
+    res.json({ message: "Pacto sellado", user });
+});
 
-module.exports = { registerUser, loginUser, getMe, claimDailyReward, addGameReward, updateMacros };
+const reviveUser = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user._id);
+    user.stats.hp = 20; // Revive con poca vida
+    user.lives = 20;    // Compatibilidad
+    await user.save();
+    res.json({ message: "Has revivido.", user });
+});
+
+const updateStatsManual = asyncHandler(async (req, res) => {
+    const { hp, xp, coins } = req.body;
+    const user = await User.findById(req.user._id);
+    if (hp !== undefined) { user.stats.hp = hp; user.lives = hp; }
+    if (xp !== undefined) user.stats.currentXP = xp;
+    if (coins !== undefined) { user.stats.coins = coins; user.coins = coins; }
+    await user.save();
+    res.json(user);
+});
+
+module.exports = {
+    getMe,
+    updateMacros,
+    claimDailyReward,
+    addGameReward,
+    setRedemptionMission,
+    reviveUser,
+    updateStatsManual
+};

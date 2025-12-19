@@ -109,7 +109,7 @@ export default function WeightWidget({ initialWeight, onUpdate }) {
 
         return (
             <div className="relative w-full h-48 select-none">
-                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
+                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-40 overflow-visible">
                     {/* Líneas Guía */}
                     <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#374151" strokeWidth="1" />
                     <line x1={padding} y1={padding} x2={width - padding} y2={padding} stroke="#374151" strokeWidth="1" strokeDasharray="4" />
@@ -168,7 +168,7 @@ export default function WeightWidget({ initialWeight, onUpdate }) {
             {/* WIDGET PRINCIPAL */}
             <div
                 onClick={() => setIsOpen(true)}
-                className="bg-gray-900 border border-gray-800 rounded-2xl p-4 h-full flex flex-col justify-between relative shadow-lg group hover:border-blue-500/50 transition-all cursor-pointer"
+                className="bg-gray-900 border border-gray-800 rounded-2xl p-4 h-40 flex flex-col justify-between relative shadow-lg group hover:border-blue-500/50 transition-all cursor-pointer"
             >
                 <div className="flex justify-between items-start z-10">
                     <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-blue-400 transition-colors">

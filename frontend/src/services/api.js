@@ -1,37 +1,33 @@
-// frontend/src/services/api.js
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
 
-// Creamos una instancia "inteligente" de Axios
 const api = axios.create({
-    baseURL: `${API_BASE_URL}/api`, // Automáticamente pone http://.../api antes de cada petición
+    baseURL: API_BASE_URL + '/api', // Se asegura de apuntar a /api
     headers: {
         'Content-Type': 'application/json',
     },
 });
 
-// --- INTERCEPTORES (La magia de la arquitectura profesional) ---
-
-// 1. Interceptor de Petición: Inyecta el token automáticamente si existe
+// Interceptor para inyectar el token automáticamente
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token'); // Recuperamos el token guardado
+        const token = localStorage.getItem('token');
         if (token) {
-            config.headers.Authorization = `Bearer ${token}`; // Se lo enviamos al backend
+            config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
     },
     (error) => Promise.reject(error)
 );
 
-// 2. Interceptor de Respuesta: Simplifica el manejo de errores
+// Interceptor para manejar errores de sesión (401)
 api.interceptors.response.use(
-    (response) => response, // Si todo va bien, devuelve la respuesta limpia
+    (response) => response,
     (error) => {
-        // Si el error es 401 (No autorizado), significa que el token expiró
         if (error.response && error.response.status === 401) {
-            // Aquí podríamos redirigir al Login automáticamente en el futuro
-            console.warn('Sesión expirada o no válida');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
         }
         return Promise.reject(error);
     }

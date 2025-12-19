@@ -13,7 +13,7 @@ const {
     updateSavedFood, // <--- Importar
     chatMacroCalculator
 } = require('../controllers/foodController');
-const { protect } = require('../middleware/authMiddleware');
+const protect = require('../middleware/authMiddleware');
 
 const upload = multer({ dest: 'uploads/' });
 

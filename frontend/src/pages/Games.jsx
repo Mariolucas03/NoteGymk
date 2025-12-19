@@ -2,12 +2,12 @@ import { useOutletContext, Link } from 'react-router-dom';
 import { Gamepad2, Dices, CircleDollarSign, Ticket, ChevronLeft, Disc, Spade, Zap } from 'lucide-react';
 
 export default function Games() {
-    // Obtenemos el usuario del contexto (Layout)
     const { user } = useOutletContext();
+    const gameCoins = user?.stats?.gameCoins || 0;
 
     const gamesList = [
         {
-            id: 'fortune-wheel', // /games/fortune-wheel
+            id: 'fortune-wheel',
             name: 'La Ruleta de la Suerte',
             desc: 'Gira y multiplica tus ganancias diarias.',
             icon: <CircleDollarSign size={40} className="text-yellow-400" />,
@@ -16,7 +16,7 @@ export default function Games() {
             status: 'Disponible'
         },
         {
-            id: 'slots', // /games/slots
+            id: 'slots',
             name: 'Neon Slots',
             desc: 'Alinea los símbolos y gana el Jackpot.',
             icon: <Zap size={40} className="text-pink-400" />,
@@ -25,7 +25,7 @@ export default function Games() {
             status: 'Disponible'
         },
         {
-            id: 'blackjack', // /games/blackjack
+            id: 'blackjack',
             name: 'Blackjack 21',
             desc: 'Vence al crupier sumando 21.',
             icon: <Spade size={40} className="text-green-400" />,
@@ -34,7 +34,7 @@ export default function Games() {
             status: 'Disponible'
         },
         {
-            id: 'roulette', // /games/roulette
+            id: 'roulette',
             name: 'Ruleta Casino',
             desc: 'Apuesta al rojo o negro clásico.',
             icon: <Disc size={40} className="text-red-400" />,
@@ -43,7 +43,7 @@ export default function Games() {
             status: 'Disponible'
         },
         {
-            id: 'dice', // /games/dice
+            id: 'dice',
             name: 'Dados Rápidos',
             desc: 'Saca mayor puntuación que la banca.',
             icon: <Dices size={40} className="text-blue-400" />,
@@ -52,7 +52,7 @@ export default function Games() {
             status: 'Disponible'
         },
         {
-            id: 'scratch', // /games/scratch
+            id: 'scratch',
             name: 'Rasca y Gana',
             desc: 'Encuentra 3 símbolos iguales.',
             icon: <Ticket size={40} className="text-purple-400" />,
@@ -65,15 +65,23 @@ export default function Games() {
     return (
         <div className="space-y-6 pb-20 animate-in fade-in select-none">
             {/* Cabecera */}
-            <div className="flex items-center gap-3 mb-6">
-                <Link to="/" className="bg-gray-900 p-2 rounded-xl border border-gray-800 text-gray-400 hover:text-white transition-colors">
-                    <ChevronLeft size={24} />
-                </Link>
-                <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <Gamepad2 className="text-purple-500" /> Sala de Juegos
-                    </h1>
-                    <p className="text-gray-400 text-xs">Diviértete y gana premios</p>
+            <div className="flex justify-between items-start mb-6">
+                <div className="flex items-center gap-3">
+                    <Link to="/" className="bg-gray-900 p-2 rounded-xl border border-gray-800 text-gray-400 hover:text-white transition-colors">
+                        <ChevronLeft size={24} />
+                    </Link>
+                    <div>
+                        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                            <Gamepad2 className="text-purple-500" /> Sala de Juegos
+                        </h1>
+                        <p className="text-gray-400 text-xs">Diviértete y gana premios</p>
+                    </div>
+                </div>
+
+                {/* SALDO FICHAS */}
+                <div className="bg-purple-900/30 border border-purple-500/30 px-3 py-1.5 rounded-xl flex flex-col items-end shadow-sm">
+                    <span className="text-xl font-black text-white leading-none">{gameCoins}</span>
+                    <span className="text-purple-400 text-[10px] font-bold uppercase leading-none">Fichas</span>
                 </div>
             </div>
 
@@ -92,7 +100,7 @@ export default function Games() {
                             <p className="text-gray-400 text-xs">{game.desc}</p>
                         </div>
 
-                        {/* BOTÓN INTELIGENTE: LINK O DESHABILITADO */}
+                        {/* BOTÓN INTELIGENTE */}
                         {game.status === 'Disponible' ? (
                             <Link
                                 to={`/games/${game.id}`}

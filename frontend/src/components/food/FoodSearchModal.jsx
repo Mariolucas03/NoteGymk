@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, X, Camera, Sparkles, Loader2, Save, ArrowLeft, Trash2, Edit2, CheckCircle, RotateCw } from 'lucide-react';
+import { Plus, X, Camera, Sparkles, Loader2, Save, ArrowLeft, Trash2, Edit2, RotateCw, PenTool, Flame, Beef, Wheat, Droplet, Leaf } from 'lucide-react';
 import api from '../../services/api';
 
 export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowToast }) {
-    const [view, setView] = useState('list');
+    const [view, setView] = useState('list'); // 'list', 'scan', 'preview', 'result', 'create'
     const [savedFoods, setSavedFoods] = useState([]);
 
     // Datos escáner
@@ -11,8 +11,13 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
     const [previewUrl, setPreviewUrl] = useState(null);
     const [userContext, setUserContext] = useState('');
 
+    // Datos selección / edición
     const [selectedFood, setSelectedFood] = useState(null);
     const [quantity, setQuantity] = useState(1);
+
+    // Datos creación manual
+    const [newFoodData, setNewFoodData] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '' });
+
     const fileInputRef = useRef(null);
 
     useEffect(() => { fetchSavedFoods(); }, []);
@@ -24,46 +29,15 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         } catch (error) { console.error(error); }
     };
 
-    // --- ACCIONES ---
-
-    const handleDeleteFood = async (id, e) => {
-        e.stopPropagation();
-        if (!confirm("¿Borrar de la lista?")) return;
-        try {
-            await api.delete(`/food/saved/${id}`);
-            setSavedFoods(prev => prev.filter(food => food._id !== id));
-            onShowToast("Alimento eliminado");
-        } catch (error) { onShowToast("Error al eliminar", "error"); }
-    };
-
-    // NUEVO: ACTUALIZAR COMIDA EXISTENTE
-    const handleUpdateFood = async () => {
-        if (!selectedFood || selectedFood._id === 'ai_temp') return;
-        try {
-            await api.put(`/food/saved/${selectedFood._id}`, selectedFood);
-            onShowToast("Comida actualizada");
-            fetchSavedFoods(); // Refrescar lista de fondo
-        } catch (error) { onShowToast("Error al actualizar", "error"); }
-    };
-
-    const handleSaveToDb = async () => {
-        if (!selectedFood) return;
-        try {
-            const res = await api.post('/food/save', selectedFood);
-            onShowToast("Comida guardada");
-            // Convertimos el temporal en guardado para activar modo edición
-            setSelectedFood({ ...res.data, icon: '🍽️' });
-            fetchSavedFoods();
-        } catch (error) { onShowToast("Error al guardar", "error"); }
-    };
+    // --- ACCIONES GENERALES ---
 
     const handleAdd = async () => {
         if (!selectedFood) return;
         try {
             await api.post('/food/add', {
                 mealId,
-                foodId: selectedFood._id === 'ai_temp' ? null : selectedFood._id,
-                rawFood: selectedFood._id === 'ai_temp' ? selectedFood : null,
+                foodId: (selectedFood._id === 'ai_temp' || selectedFood._id === 'manual_temp') ? null : selectedFood._id,
+                rawFood: (selectedFood._id === 'ai_temp' || selectedFood._id === 'manual_temp') ? selectedFood : null,
                 quantity
             });
             onFoodAdded();
@@ -72,12 +46,31 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         } catch (error) { onShowToast("Error al añadir", "error"); }
     };
 
-    // --- LOGICA IA ---
+    const handleSaveToDb = async () => {
+        if (!selectedFood) return;
+        try {
+            const res = await api.post('/food/save', selectedFood);
+            onShowToast("Comida guardada");
+            setSelectedFood({ ...res.data, icon: '🍽️' });
+            fetchSavedFoods();
+        } catch (error) { onShowToast("Error al guardar", "error"); }
+    };
+
+    const handleDeleteFood = async (id, e) => {
+        e.stopPropagation();
+        if (!window.confirm("¿Borrar de la lista?")) return;
+        try {
+            await api.delete(`/food/saved/${id}`);
+            setSavedFoods(prev => prev.filter(food => food._id !== id));
+            onShowToast("Alimento eliminado");
+        } catch (error) { onShowToast("Error al eliminar", "error"); }
+    };
+
+    // --- LOGICA IA (ESCANEAR) ---
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const objectUrl = URL.createObjectURL(file);
-        setPreviewUrl(objectUrl);
+        setPreviewUrl(URL.createObjectURL(file));
         setSelectedFile(file);
         setView('preview');
     };
@@ -91,13 +84,31 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
 
         try {
             const res = await api.post('/food/analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-            const aiFood = { ...res.data, _id: 'ai_temp', icon: '✨' };
-            setSelectedFood(aiFood);
+            setSelectedFood({ ...res.data, _id: 'ai_temp', icon: '✨' });
             setView('result');
         } catch (error) {
-            onShowToast(error.response?.data?.message || "Error al escanear", "error");
+            onShowToast("Error al escanear", "error");
             setView('list');
         }
+    };
+
+    // --- LOGICA MANUAL (CREAR) ---
+    const handleCreateManual = () => {
+        if (!newFoodData.name || !newFoodData.calories) return alert("Nombre y Calorías obligatorios");
+
+        const manualFood = {
+            _id: 'manual_temp',
+            name: newFoodData.name,
+            calories: Number(newFoodData.calories),
+            protein: Number(newFoodData.protein || 0),
+            carbs: Number(newFoodData.carbs || 0),
+            fat: Number(newFoodData.fat || 0),
+            fiber: Number(newFoodData.fiber || 0),
+            servingSize: '1 ración',
+            icon: '📝'
+        };
+        setSelectedFood(manualFood);
+        setView('result'); // Ir a vista final para confirmar/añadir
     };
 
     useEffect(() => { return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }; }, [previewUrl]);
@@ -110,7 +121,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                 {view === 'list' ? (
                     <span className="font-bold text-white text-lg">Añadir Alimento</span>
                 ) : (
-                    <button onClick={() => { setView('list'); setSelectedFood(null); setUserContext(''); }} className="flex items-center gap-2 text-gray-400">
+                    <button onClick={() => { setView('list'); setSelectedFood(null); }} className="flex items-center gap-2 text-gray-400">
                         <ArrowLeft size={20} /> Volver
                     </button>
                 )}
@@ -119,32 +130,39 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
 
             <div className="flex-1 overflow-y-auto p-4 flex flex-col">
 
-                {/* VISTA 1: LISTA */}
+                {/* VISTA 1: MENU PRINCIPAL */}
                 {view === 'list' && (
                     <>
-                        <div onClick={() => fileInputRef.current.click()} className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 mb-6 flex items-center justify-center gap-4 cursor-pointer shadow-lg active:scale-95 transition-transform">
-                            <div className="bg-white/20 p-3 rounded-full"><Camera size={32} className="text-white" /></div>
-                            <div><h3 className="text-white font-bold text-lg">Escanear Comida</h3><p className="text-blue-100 text-xs">Identificar con IA</p></div>
+                        {/* BOTONES DE ACCIÓN RÁPIDA */}
+                        <div className="grid grid-cols-2 gap-3 mb-6">
+                            <div onClick={() => fileInputRef.current.click()} className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 transition-transform border border-blue-500/30">
+                                <Camera size={28} className="text-blue-100" />
+                                <span className="text-white font-bold text-sm">Escanear IA</span>
+                            </div>
+                            <div onClick={() => setView('create')} className="bg-gradient-to-br from-gray-800 to-gray-700 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 transition-transform border border-gray-600">
+                                <PenTool size={28} className="text-gray-200" />
+                                <span className="text-white font-bold text-sm">Crear Manual</span>
+                            </div>
                         </div>
+
                         <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
 
                         <h4 className="text-gray-500 text-xs font-bold uppercase mb-3 ml-1">Mis Comidas Guardadas</h4>
                         <div className="space-y-2">
                             {savedFoods.length === 0 ? (
-                                <p className="text-center text-gray-600 text-sm py-10">Lista vacía. ¡Escanea algo!</p>
+                                <div className="text-center py-10 border border-dashed border-gray-800 rounded-2xl">
+                                    <p className="text-gray-500 text-sm">No tienes comidas guardadas.</p>
+                                    <p className="text-xs text-gray-600">Crea una o escanea para empezar.</p>
+                                </div>
                             ) : (
                                 savedFoods.map(food => (
-                                    <div
-                                        key={food._id}
-                                        onClick={() => { setSelectedFood(food); setView('result'); }}
-                                        className="bg-gray-900 border border-gray-800 p-4 rounded-xl flex justify-between items-center cursor-pointer active:scale-95 transition-transform group"
-                                    >
+                                    <div key={food._id} onClick={() => { setSelectedFood(food); setView('result'); }} className="bg-gray-900 border border-gray-800 p-4 rounded-xl flex justify-between items-center cursor-pointer active:scale-95 transition-transform group hover:bg-gray-800">
                                         <div className="flex items-center gap-4">
-                                            <span className="text-2xl">{food.icon}</span>
+                                            <span className="text-2xl">{food.icon || '🍽️'}</span>
                                             <div><h4 className="font-bold text-white">{food.name}</h4><p className="text-xs text-gray-500">{food.calories} kcal</p></div>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <button onClick={(e) => handleDeleteFood(food._id, e)} className="p-2 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={18} /></button>
+                                            <button onClick={(e) => handleDeleteFood(food._id, e)} className="p-2 text-gray-600 hover:text-red-500"><Trash2 size={18} /></button>
                                             <Plus className="text-blue-500" />
                                         </div>
                                     </div>
@@ -154,45 +172,73 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                     </>
                 )}
 
-                {/* VISTA 2: PREVIEW + CONTEXTO */}
+                {/* VISTA 2: FORMULARIO MANUAL (AÑADIDA FIBRA) */}
+                {view === 'create' && (
+                    <div className="animate-in fade-in space-y-4">
+                        <h3 className="text-xl font-bold text-white mb-4">Nueva Comida</h3>
+
+                        <div>
+                            <label className="text-xs text-gray-500 font-bold uppercase ml-1">Nombre</label>
+                            <input type="text" placeholder="Ej: Arroz con Pollo" className="w-full bg-gray-800 text-white p-4 rounded-xl border border-gray-700 focus:border-blue-500 outline-none"
+                                value={newFoodData.name} onChange={e => setNewFoodData({ ...newFoodData, name: e.target.value })} autoFocus />
+                        </div>
+
+                        <div>
+                            <label className="text-xs text-gray-500 font-bold uppercase ml-1 flex items-center gap-1"><Flame size={12} /> Calorías</label>
+                            <input type="number" placeholder="0" className="w-full bg-gray-800 text-white p-4 rounded-xl border border-gray-700 focus:border-orange-500 outline-none"
+                                value={newFoodData.calories} onChange={e => setNewFoodData({ ...newFoodData, calories: e.target.value })} />
+                        </div>
+
+                        {/* GRID DE MACROS (4 COLUMNAS AHORA) */}
+                        <div className="grid grid-cols-4 gap-2">
+                            <div>
+                                <label className="text-[10px] text-blue-400 font-bold uppercase mb-1 block text-center">Prot</label>
+                                <input type="number" placeholder="0" className="w-full bg-gray-800 text-white p-2 rounded-xl border border-gray-700 text-center" value={newFoodData.protein} onChange={e => setNewFoodData({ ...newFoodData, protein: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-yellow-400 font-bold uppercase mb-1 block text-center">Carb</label>
+                                <input type="number" placeholder="0" className="w-full bg-gray-800 text-white p-2 rounded-xl border border-gray-700 text-center" value={newFoodData.carbs} onChange={e => setNewFoodData({ ...newFoodData, carbs: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-red-400 font-bold uppercase mb-1 block text-center">Grasa</label>
+                                <input type="number" placeholder="0" className="w-full bg-gray-800 text-white p-2 rounded-xl border border-gray-700 text-center" value={newFoodData.fat} onChange={e => setNewFoodData({ ...newFoodData, fat: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-green-500 font-bold uppercase mb-1 block text-center">Fibra</label>
+                                <input type="number" placeholder="0" className="w-full bg-gray-800 text-white p-2 rounded-xl border border-gray-700 text-center" value={newFoodData.fiber} onChange={e => setNewFoodData({ ...newFoodData, fiber: e.target.value })} />
+                            </div>
+                        </div>
+
+                        <button onClick={handleCreateManual} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl mt-4 shadow-lg active:scale-95 transition-transform">CONTINUAR</button>
+                    </div>
+                )}
+
+                {/* VISTA 3: PREVIEW FOTO */}
                 {view === 'preview' && (
                     <div className="flex flex-col h-full animate-in fade-in">
                         <div className="flex-1 bg-gray-800 rounded-2xl overflow-hidden relative mb-4 border border-gray-700">
                             <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                         </div>
-                        <div className="bg-gray-900 border border-gray-800 p-4 rounded-2xl mb-4">
-                            <label className="text-xs text-gray-500 font-bold uppercase mb-2 block">Detalles opcionales</label>
-                            <input autoFocus type="text" placeholder="Ej: Sin azúcar, 200g..." value={userContext} onChange={(e) => setUserContext(e.target.value)} className="w-full bg-gray-800 text-white border-b border-gray-700 pb-2 focus:outline-none focus:border-blue-500 placeholder-gray-600" />
-                        </div>
-                        <button onClick={handleAnalyze} className="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
-                            <Sparkles size={20} /> ANALIZAR AHORA
-                        </button>
+                        <input type="text" placeholder="Detalles opcionales (ej: sin salsa)" value={userContext} onChange={(e) => setUserContext(e.target.value)} className="w-full bg-gray-900 border border-gray-800 text-white p-4 rounded-xl mb-4 focus:outline-none focus:border-blue-500" />
+                        <button onClick={handleAnalyze} className="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"><Sparkles size={20} /> ANALIZAR</button>
                     </div>
                 )}
 
-                {/* VISTA 2.5: LOADING */}
+                {/* VISTA 4: LOADING */}
                 {view === 'scan' && (
                     <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
                         <div className="w-24 h-24 bg-blue-600/20 rounded-full flex items-center justify-center mb-4 relative"><Loader2 className="animate-spin text-blue-500" size={48} /><Sparkles className="absolute top-0 right-0 text-yellow-400 animate-ping" /></div>
-                        <h3 className="text-xl font-bold text-white">Consultando IA...</h3>
+                        <h3 className="text-xl font-bold text-white">Analizando...</h3>
                     </div>
                 )}
 
-                {/* VISTA 3: RESULTADO EDITABLE */}
+                {/* VISTA 5: RESULTADO FINAL (Edición antes de añadir) */}
                 {view === 'result' && selectedFood && (
                     <div className="flex flex-col items-center mt-4 space-y-6 animate-in zoom-in-95">
                         <div className="text-6xl animate-bounce">{selectedFood.icon}</div>
-
                         <div className="text-center w-full px-6">
-                            {/* INPUT NOMBRE EDITABLE */}
-                            <input
-                                type="text"
-                                value={selectedFood.name}
-                                onChange={(e) => setSelectedFood({ ...selectedFood, name: e.target.value })}
-                                className="bg-transparent text-2xl font-bold text-white text-center w-full border-b border-gray-700 focus:border-blue-500 outline-none pb-1 placeholder-gray-600"
-                                placeholder="Nombre comida"
-                            />
-                            <p className="text-gray-500 text-sm mt-2">{selectedFood.calories * quantity} Kcal</p>
+                            <input type="text" value={selectedFood.name} onChange={(e) => setSelectedFood({ ...selectedFood, name: e.target.value })} className="bg-transparent text-2xl font-bold text-white text-center w-full border-b border-gray-700 focus:border-blue-500 outline-none pb-1" />
+                            <p className="text-gray-500 text-sm mt-2">{Math.round(selectedFood.calories * quantity)} Kcal</p>
                         </div>
 
                         <div className="flex items-center gap-6 bg-gray-800 p-2 rounded-2xl">
@@ -209,17 +255,10 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                         </div>
 
                         <div className="w-full space-y-3 pt-4">
-                            {/* Botón Principal: AÑADIR A HOY */}
                             <button onClick={handleAdd} className="w-full bg-green-600 hover:bg-green-500 py-4 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"><Plus size={24} /> AÑADIR A HOY</button>
-
-                            {/* Botón Secundario: GUARDAR O ACTUALIZAR */}
-                            <div className="flex gap-2">
-                                {selectedFood._id === 'ai_temp' ? (
-                                    <button onClick={handleSaveToDb} className="flex-1 bg-gray-800 hover:bg-gray-700 py-4 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 border border-gray-700"><Save size={20} /> GUARDAR</button>
-                                ) : (
-                                    <button onClick={handleUpdateFood} className="flex-1 bg-blue-900/40 hover:bg-blue-900/60 py-4 rounded-xl text-blue-200 font-bold shadow-lg flex items-center justify-center gap-2 border border-blue-500/30"><RotateCw size={20} /> ACTUALIZAR</button>
-                                )}
-                            </div>
+                            {(selectedFood._id === 'ai_temp' || selectedFood._id === 'manual_temp') && (
+                                <button onClick={handleSaveToDb} className="w-full bg-gray-800 hover:bg-gray-700 py-4 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 border border-gray-700"><Save size={20} /> GUARDAR EN LISTA</button>
+                            )}
                         </div>
                     </div>
                 )}

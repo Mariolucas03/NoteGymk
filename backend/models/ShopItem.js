@@ -1,23 +1,35 @@
 const mongoose = require('mongoose');
 
 const shopItemSchema = new mongoose.Schema({
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Si es null, es un objeto del sistema (global)
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null // null = Item del sistema, ID = Recompensa personal
+    },
     name: { type: String, required: true },
     price: { type: Number, required: true },
-
-    // Categoría: 'reward' (personalizada), 'consumable' (pociones), 'chest' (cofres)
     category: {
         type: String,
-        enum: ['reward', 'consumable', 'chest'],
-        required: true
+        required: true,
+        // LAS 8 CATEGORÍAS EXACTAS
+        enum: [
+            'reward',      // Recompensas personales
+            'consumable',  // Pociones
+            'avatar',      // Skins
+            'frame',       // Marcos
+            'theme',       // Temas
+            'chest',       // Cofres
+            'pet',         // Mascotas
+            'title'        // Títulos
+        ]
     },
-
-    // Efecto (Solo para consumibles del sistema)
-    // 'heal' (vida), 'xp' (experiencia), 'none' (recompensa real)
-    effectType: { type: String, default: 'none' },
-    effectValue: { type: Number, default: 0 }, // Cuánta vida/xp da
-
-    icon: { type: String, default: '🎁' }
+    icon: { type: String, default: '📦' },
+    description: { type: String, default: '' },
+    // Para lógica de uso (ej: 'heal', 'xp', 'random_low')
+    effectType: { type: String, default: 'cosmetic' },
+    // Valor numérico (ej: 10 de vida)
+    effectValue: { type: Number, default: 0 },
+    createdAt: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('ShopItem', shopItemSchema);

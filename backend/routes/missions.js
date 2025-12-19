@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getMissions, createMission, completeMission, deleteMission } = require('../controllers/missionController');
-const { protect } = require('../middleware/authMiddleware');
+const protect = require('../middleware/authMiddleware');
 
 router.get('/', protect, getMissions);
 router.post('/', protect, createMission);

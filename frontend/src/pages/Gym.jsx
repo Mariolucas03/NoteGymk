@@ -234,8 +234,8 @@ export default function Gym() {
                                             key={int}
                                             onClick={() => setSportData({ ...sportData, intensity: int })}
                                             className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${sportData.intensity === int
-                                                    ? 'bg-green-600 text-black border-green-600'
-                                                    : 'bg-gray-950 text-gray-400 border-gray-800 hover:border-gray-600'
+                                                ? 'bg-green-600 text-black border-green-600'
+                                                : 'bg-gray-950 text-gray-400 border-gray-800 hover:border-gray-600'
                                                 }`}
                                         >
                                             {int}

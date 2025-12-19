@@ -1,39 +1,78 @@
 import { useState, useEffect } from 'react';
-import { Clock, Check, ChevronDown, MoreVertical } from 'lucide-react';
+import { Clock, Check, ChevronDown, MoreVertical, Trophy, Loader2 } from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../common/Toast';
 
 export default function ActiveWorkout({ routine, onClose, onFinish }) {
-    // 1. Estado del Cronómetro
     const [seconds, setSeconds] = useState(0);
+    const [finishing, setFinishing] = useState(false);
+    const [toast, setToast] = useState(null);
+    const [loadingHistory, setLoadingHistory] = useState(true);
 
-    // 2. Estado de los Ejercicios (Inicialización segura)
+    // Estado inicial
     const [exercises, setExercises] = useState(() => {
         if (!routine || !routine.exercises) return [];
         return routine.exercises.map(ex => ({
             ...ex,
-            // Creamos las series vacías para rellenar
-            setsData: Array(ex.sets || 3).fill({ kg: '', reps: '', completed: false })
+            setsData: Array(ex.sets || 3).fill({ kg: '', reps: '', completed: false }),
+            pr: null // Inicializamos como null
         }));
     });
 
-    const [finishing, setFinishing] = useState(false);
-    const [toast, setToast] = useState(null);
-
-    // Iniciar cronómetro al montar
+    // 1. CRONÓMETRO
     useEffect(() => {
         const timer = setInterval(() => setSeconds(s => s + 1), 1000);
         return () => clearInterval(timer);
     }, []);
 
-    // Formatear tiempo (MM:SS)
+    // 2. CARGAR HISTORIAL
+    useEffect(() => {
+        const fetchHistory = async () => {
+            try {
+                const exerciseNames = routine.exercises.map(e => e.name);
+                const res = await api.post('/gym/history-stats', { exercises: exerciseNames });
+                const historyData = res.data;
+
+                setExercises(prevExercises => prevExercises.map(ex => {
+                    const stats = historyData[ex.name];
+
+                    if (!stats) return ex;
+
+                    // Pre-rellenar inputs
+                    const filledSets = ex.setsData.map((set, index) => {
+                        if (stats.lastSets && stats.lastSets[index]) {
+                            return {
+                                ...set,
+                                kg: stats.lastSets[index].weight,
+                                reps: stats.lastSets[index].reps
+                            };
+                        }
+                        return set;
+                    });
+
+                    return {
+                        ...ex,
+                        setsData: filledSets,
+                        pr: stats.bestSet // Ahora guardamos el objeto {weight, reps, value1RM}
+                    };
+                }));
+
+            } catch (error) {
+                console.error("Error cargando historial", error);
+            } finally {
+                setLoadingHistory(false);
+            }
+        };
+
+        if (routine) fetchHistory();
+    }, [routine]);
+
     const formatTime = (totalSeconds) => {
         const min = Math.floor(totalSeconds / 60);
         const sec = totalSeconds % 60;
         return `${min}:${sec < 10 ? '0' : ''}${sec}`;
     };
 
-    // Manejar cambios en los inputs (Kg / Reps)
     const handleInputChange = (exIndex, setIndex, field, value) => {
         const updatedEx = [...exercises];
         const newSets = [...updatedEx[exIndex].setsData];
@@ -42,12 +81,10 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         setExercises(updatedEx);
     };
 
-    // Marcar serie como completada
     const toggleSetComplete = (exIndex, setIndex) => {
         const updatedEx = [...exercises];
         const currentSet = updatedEx[exIndex].setsData[setIndex];
 
-        // Validación simple: Deben tener datos para marcar como hecha
         if (!currentSet.kg || !currentSet.reps) {
             return setToast({ message: 'Rellena Kg y Reps primero', type: 'error' });
         }
@@ -56,10 +93,8 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         setExercises(updatedEx);
     };
 
-    // Finalizar Entrenamiento
     const handleFinish = async () => {
         setFinishing(true);
-
         try {
             const logData = {
                 routineId: routine._id,
@@ -68,36 +103,30 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                 exercises: exercises.map(ex => ({
                     name: ex.name,
                     sets: ex.setsData.map(s => ({
-                        weight: parseFloat(s.kg) || 0, // Evitar NaN
-                        reps: parseFloat(s.reps) || 0,   // Evitar NaN
+                        weight: parseFloat(s.kg) || 0,
+                        reps: parseFloat(s.reps) || 0,
                         completed: s.completed
-                    }))
+                    })).filter(s => s.weight > 0 || s.reps > 0)
                 }))
             };
 
             const res = await api.post('/gym/log', logData);
-
-            // Pasamos la respuesta completa al padre (Gym.jsx) para mostrar recompensas
             onFinish(res.data);
-
         } catch (error) {
-            setToast({ message: 'Error al guardar el entrenamiento', type: 'error' });
-            console.error(error);
+            setToast({ message: 'Error al guardar', type: 'error' });
             setFinishing(false);
         }
     };
 
-    // Si no hay datos de rutina válidos, mostramos error o cerramos
     if (!routine) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] bg-black flex flex-col animate-in slide-in-from-bottom duration-300">
-
+        <div className="fixed inset-0 z-[60] bg-black flex flex-col animate-in slide-in-from-bottom duration-300 select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
             {/* HEADER */}
             <div className="flex justify-between items-center p-4 bg-gray-900 border-b border-gray-800 sticky top-0 z-20">
-                <button onClick={onClose} className="text-gray-400 p-2 hover:bg-gray-800 rounded-full transition-colors">
+                <button onClick={onClose} className="text-gray-400 p-2 hover:bg-gray-800 rounded-full">
                     <ChevronDown />
                 </button>
                 <div className="flex flex-col items-center">
@@ -106,87 +135,66 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                         <Clock size={14} />{formatTime(seconds)}
                     </div>
                 </div>
-                <button
-                    onClick={handleFinish}
-                    disabled={finishing}
-                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-5 py-2 rounded-full text-white font-bold text-sm shadow-lg shadow-blue-900/20 transition-all active:scale-95"
-                >
+                <button onClick={handleFinish} disabled={finishing} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-5 py-2 rounded-full text-white font-bold text-sm shadow-lg shadow-blue-900/20 transition-all active:scale-95">
                     {finishing ? '...' : 'Terminar'}
                 </button>
             </div>
 
-            {/* BODY (Lista de Ejercicios) */}
+            {/* BODY */}
             <div className="flex-1 overflow-y-auto p-4 pb-20 space-y-6 custom-scrollbar">
                 {exercises.map((ex, exIdx) => (
                     <div key={ex._id || exIdx} className="space-y-3">
-                        {/* Cabecera del Ejercicio */}
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-blue-400 font-bold text-lg tracking-tight">{ex.name}</h3>
+
+                        {/* Cabecera Ejercicio */}
+                        <div className="flex justify-between items-center px-1">
+                            <div className="flex flex-col">
+                                <h3 className="text-blue-400 font-bold text-lg tracking-tight leading-none">{ex.name}</h3>
+                                {/* PR INDICATOR (NUEVO FORMATO) */}
+                                {ex.pr && ex.pr.value1RM > 0 && (
+                                    <div className="flex items-center gap-1 mt-1 text-[10px] text-yellow-500 font-bold uppercase tracking-wider">
+                                        <Trophy size={10} className="fill-yellow-500" />
+                                        PR: <span className="text-white ml-0.5">{ex.pr.weight}kg x {ex.pr.reps}</span>
+                                    </div>
+                                )}
+                            </div>
                             <button className="text-gray-600 hover:text-gray-400"><MoreVertical size={20} /></button>
                         </div>
 
-                        {/* Tabla de Sets */}
+                        {/* Tabla Sets */}
                         <div className="w-full bg-gray-900/50 rounded-xl p-2 border border-gray-800">
-                            {/* Cabecera de columnas */}
-                            <div className="grid grid-cols-10 gap-2 mb-2 text-[10px] text-gray-500 font-bold text-center uppercase tracking-wider">
+                            <div className="grid grid-cols-7 gap-2 mb-2 text-[10px] text-gray-500 font-bold text-center uppercase tracking-wider">
                                 <div className="col-span-1">#</div>
-                                <div className="col-span-3 text-left pl-2">Previo</div>
-                                <div className="col-span-2">Kg</div>
+                                <div className="col-span-3">Kg</div>
                                 <div className="col-span-2">Reps</div>
-                                <div className="col-span-2"><Check size={14} className="mx-auto" /></div>
+                                <div className="col-span-1"><Check size={14} className="mx-auto" /></div>
                             </div>
 
-                            {/* Filas de Sets */}
                             <div className="space-y-1">
                                 {ex.setsData.map((set, setIdx) => (
-                                    <div
-                                        key={setIdx}
-                                        className={`grid grid-cols-10 gap-2 items-center rounded-lg p-2 transition-all duration-200 ${set.completed ? 'bg-green-900/20 border border-green-500/30' : 'bg-gray-900 border border-transparent'
-                                            }`}
-                                    >
-                                        {/* Número de serie */}
-                                        <div className="col-span-1 text-center font-bold text-gray-400 bg-gray-800 rounded py-1.5 text-xs">
+                                    <div key={setIdx} className={`grid grid-cols-7 gap-2 items-center rounded-lg p-2 transition-all duration-200 ${set.completed ? 'bg-green-900/20 border border-green-500/30' : 'bg-gray-900 border border-transparent'}`}>
+                                        <div className="col-span-1 text-center font-bold text-gray-400 bg-gray-800 rounded py-2 text-xs">
                                             {setIdx + 1}
                                         </div>
-
-                                        {/* Dato Previo (Placeholder por ahora) */}
-                                        <div className="col-span-3 text-left pl-2 text-gray-600 text-xs font-mono">
-                                            -
-                                        </div>
-
-                                        {/* Input KG */}
-                                        <div className="col-span-2">
+                                        <div className="col-span-3 relative">
                                             <input
                                                 type="number"
-                                                placeholder="0"
+                                                placeholder={loadingHistory ? "..." : "0"}
                                                 value={set.kg}
                                                 onChange={(e) => handleInputChange(exIdx, setIdx, 'kg', e.target.value)}
-                                                className={`w-full text-center bg-transparent font-bold focus:outline-none rounded py-1 transition-colors ${set.completed ? 'text-green-400' : 'text-white bg-gray-800 focus:bg-gray-700'
-                                                    }`}
+                                                className={`w-full text-center bg-gray-800 font-bold focus:outline-none rounded py-2 text-white focus:bg-gray-700 transition-colors ${set.completed ? 'text-green-400' : ''}`}
                                             />
                                         </div>
-
-                                        {/* Input REPS */}
                                         <div className="col-span-2">
                                             <input
                                                 type="number"
-                                                placeholder="0"
+                                                placeholder={loadingHistory ? "..." : "0"}
                                                 value={set.reps}
                                                 onChange={(e) => handleInputChange(exIdx, setIdx, 'reps', e.target.value)}
-                                                className={`w-full text-center bg-transparent font-bold focus:outline-none rounded py-1 transition-colors ${set.completed ? 'text-green-400' : 'text-white bg-gray-800 focus:bg-gray-700'
-                                                    }`}
+                                                className={`w-full text-center bg-gray-800 font-bold focus:outline-none rounded py-2 text-white focus:bg-gray-700 transition-colors ${set.completed ? 'text-green-400' : ''}`}
                                             />
                                         </div>
-
-                                        {/* Botón Check */}
-                                        <div className="col-span-2 flex justify-center">
-                                            <button
-                                                onClick={() => toggleSetComplete(exIdx, setIdx)}
-                                                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${set.completed
-                                                        ? 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.4)]'
-                                                        : 'bg-gray-800 text-gray-600 hover:bg-gray-700 hover:text-gray-400'
-                                                    }`}
-                                            >
+                                        <div className="col-span-1 flex justify-center">
+                                            <button onClick={() => toggleSetComplete(exIdx, setIdx)} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${set.completed ? 'bg-green-500 text-black shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'bg-gray-800 text-gray-600 hover:text-gray-400'}`}>
                                                 <Check size={18} strokeWidth={3} />
                                             </button>
                                         </div>
@@ -196,6 +204,12 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                         </div>
                     </div>
                 ))}
+
+                {loadingHistory && (
+                    <div className="flex justify-center py-4 text-xs text-gray-600 animate-pulse gap-2">
+                        <Loader2 size={14} className="animate-spin" /> Cargando tu historial...
+                    </div>
+                )}
             </div>
         </div>
     );

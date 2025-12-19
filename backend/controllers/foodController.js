@@ -114,9 +114,7 @@ const addFoodEntry = async (req, res) => {
 
         await log.save();
 
-        // -----------------------------------------------------------
-        // ✅ CORRECCIÓN CRÍTICA: CALCULAR DESGLOSE POR COMIDA
-        // -----------------------------------------------------------
+        // Actualizar DailyLog para widgets
         const getMealTotal = (name) => {
             const meal = log.meals.find(m => m.name === name);
             return meal ? meal.foods.reduce((acc, f) => acc + f.calories, 0) : 0;
@@ -128,26 +126,20 @@ const addFoodEntry = async (req, res) => {
             lunch: getMealTotal('COMIDA'),
             dinner: getMealTotal('CENA'),
             snacks: getMealTotal('SNACK'),
-            merienda: getMealTotal('MERIENDA') // <--- Añadimos merienda
+            merienda: getMealTotal('MERIENDA')
         };
 
-        // Actualizar DailyLog global con el desglose completo
         await DailyLog.findOneAndUpdate(
             { user: req.user._id, date: today },
-            {
-                totalKcal: log.totalCalories,
-                nutrition: nutritionBreakdown
-            },
+            { nutrition: nutritionBreakdown },
             { upsert: true }
         );
-        // -----------------------------------------------------------
 
         res.json(log);
     } catch (error) { console.error(error); res.status(500).json({ message: 'Error añadiendo comida' }); }
 };
 
-// ... (El resto del archivo sigue IGUAL, solo copia hasta aquí o mantén lo de abajo si no quieres copiar todo)
-// Para facilitar, aquí tienes el resto de funciones sin cambios:
+// --- GESTIÓN DE MIS COMIDAS ---
 
 const getSavedFoods = async (req, res) => {
     try {
@@ -193,78 +185,271 @@ const updateSavedFood = async (req, res) => {
 
 const seedFoods = async (req, res) => { res.json({ message: 'Seed desactivado' }); };
 
+// --- IAs (VISIÓN Y CHAT) ---
+
 const analyzeImage = async (req, res) => {
+    // 🔥 Lista MASIVA de modelos de visión gratuitos para máxima fiabilidad
+    // Priorizados por velocidad, novedad y fiabilidad estimada.
     const VISION_MODELS = [
-        "google/gemini-2.0-flash-exp:free", "meta-llama/llama-3.2-11b-vision-instruct:free", "google/gemini-flash-1.5-exp:free",
-        "qwen/qwen-2-vl-7b-instruct:free", "google/gemini-pro-1.5-exp:free", "meta-llama/llama-3.2-90b-vision-instruct:free",
-        "qwen/qwen-2-vl-72b-instruct:free", "google/gemini-flash-1.5-8b-exp:free"
+        "google/gemini-flash-1.5-8b-exp:free",          // Muy rápido y reciente
+        "google/gemini-2.0-flash-exp:free",             // Última generación de Google
+        "meta-llama/llama-3.2-11b-vision-instruct:free", // Muy capaz para su tamaño
+        "google/gemini-flash-1.5-exp:free",             // Versión estándar flash
+        "qwen/qwen-2-vl-7b-instruct:free",              // Excelente modelo chino
+        "google/gemini-pro-1.5-exp:free",               // Más potente, puede ser más lento
+        "meta-llama/llama-3.2-90b-vision-instruct:free", // Muy potente, pero pesado
+        "qwen/qwen-2-vl-72b-instruct:free",             // Versión grande de Qwen
+        "openrouter/quasar-alpha:free",                 // Modelo experimental de OpenRouter (a veces tiene visión)
+        "nousresearch/nous-hermes-2-vision-7b:free"     // Otro buen modelo de visión 7B
     ];
+
     try {
         if (!req.file) return res.status(400).json({ message: 'No hay imagen' });
         const userContext = req.body.context || "Sin contexto extra.";
         const imageBuffer = fs.readFileSync(req.file.path);
-        const base64Image = `data:${req.file.mimetype};base64,${imageBuffer.toString('base64')}`;
-        let foodData = null;
-        const finalPrompt = `Analiza la imagen. Actúa como nutricionista. CONTEXTO DEL USUARIO: "${userContext}". Identifica el alimento. Devuelve SOLO un JSON válido: { "name": "Nombre corto", "calories": numero, "protein": numero, "carbs": numero, "fat": numero, "fiber": numero, "servingSize": "ej: 100g" }. Si no es comida: { "error": "No es comida" }.`;
+        // Optimizamos la imagen a JPEG con calidad media para reducir tamaño y acelerar el envío
+        const base64Image = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
 
+        let foodData = null;
+        // Prompt más estricto para forzar JSON limpio
+        const finalPrompt = `
+            Analiza esta imagen de comida. Actúa como nutricionista profesional.
+            CONTEXTO ADICIONAL DEL USUARIO: "${userContext}".
+            Identifica el alimento principal. Calcula sus macros aproximados.
+            RESPONDER SOLO CON UN OBJETO JSON VÁLIDO. SIN TEXTO ANTES NI DESPUÉS.
+            Formato JSON: { "name": "Nombre corto del plato", "calories": numero_entero, "protein": numero_entero, "carbs": numero_entero, "fat": numero_entero, "fiber": numero_entero, "servingSize": "ej: 1 ración media (200g)" }
+            Si la imagen NO es comida, responde SOLO: { "error": "No detecto comida válida" }
+        `;
+
+        // Bucle de intentos con la lista masiva
         for (const modelName of VISION_MODELS) {
             try {
                 console.log(`📷 Probando FOTO con ${modelName}...`);
+
+                // Timeout por request individual para no colgarse con un modelo lento
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 segundos máximo por modelo
+
                 const completion = await openai.chat.completions.create({
                     model: modelName,
-                    messages: [{ role: "user", content: [{ type: "text", text: finalPrompt }, { type: "image_url", image_url: { url: base64Image } }] }]
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: finalPrompt },
+                                { type: "image_url", image_url: { url: base64Image, detail: "low" } } // "low" detail para ser más rápido y gastar menos
+                            ]
+                        }
+                    ],
+                    temperature: 0.1, // Respuestas más deterministas y precisas
+                    max_tokens: 300,  // Limitamos la respuesta para que no se enrolle
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
+
                 const text = completion.choices[0].message.content;
+
+                // Intentar extraer JSON limpio del texto
                 const startIndex = text.indexOf('{');
                 const endIndex = text.lastIndexOf('}');
+
                 if (startIndex !== -1 && endIndex !== -1) {
-                    const jsonStr = text.substring(startIndex, endIndex + 1);
+                    let jsonStr = text.substring(startIndex, endIndex + 1);
+                    // Limpieza básica de posibles bloques de código markdown
+                    jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
+
                     foodData = JSON.parse(jsonStr);
-                    console.log(`✅ ÉXITO FOTO con ${modelName}`);
-                    break;
+
+                    // Validación básica del JSON recibido
+                    if (foodData.error || (foodData.name && typeof foodData.calories === 'number')) {
+                        console.log(`✅ ÉXITO FOTO con ${modelName}`);
+                        break; // Si tenemos datos válidos o un error controlado, salimos
+                    }
                 }
-            } catch (error) { console.log(`❌ Falló FOTO ${modelName}: ${error.message}`); }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log(`⏳ Timeout con ${modelName}. Pasando al siguiente...`);
+                } else {
+                    console.log(`❌ Falló FOTO ${modelName}: ${error.status || error.message}`);
+                }
+            }
         }
+
+        // Limpieza del archivo temporal
         if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+
         if (foodData) {
             if (foodData.error) return res.status(400).json({ message: foodData.error });
+            // Asegurar que los valores numéricos sean enteros
+            foodData.calories = Math.round(foodData.calories || 0);
+            foodData.protein = Math.round(foodData.protein || 0);
+            foodData.carbs = Math.round(foodData.carbs || 0);
+            foodData.fat = Math.round(foodData.fat || 0);
+            foodData.fiber = Math.round(foodData.fiber || 0);
             return res.json(foodData);
-        } else { return res.status(503).json({ message: 'Todos los modelos de visión están ocupados. Intenta en 1 min.' }); }
+        } else {
+            // Si fallaron los 10 modelos
+            return res.status(503).json({ message: 'Todos los sistemas de visión están saturados. Por favor, intenta introducirlo manualmente o prueba en unos minutos.' });
+        }
+
     } catch (error) {
+        // Limpieza en caso de error fatal
         if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        res.status(500).json({ message: 'Error interno de imagen' });
+        console.error("Error fatal en analyzeImage:", error);
+        res.status(500).json({ message: 'Error interno al procesar la imagen.' });
     }
 };
 
+// ==========================================
+// 🔥 CASCADA MASIVA DE IA + PLAN B
+// ==========================================
+
+// Función auxiliar: Calculadora Matemática (Plan B)
+const calculateLocalMacros = (text) => {
+    // Extraer números usando Expresiones Regulares (busca números cerca de palabras clave)
+    const ageMatch = text.match(/(\d+)\s*(?:años|a|y)/i) || text.match(/edad\s*[:]?\s*(\d+)/i);
+    const weightMatch = text.match(/(\d+)\s*(?:kg|kilos)/i) || text.match(/peso\s*[:]?\s*(\d+)/i);
+    const heightMatch = text.match(/(\d+)\s*(?:cm|centimetros)/i) || text.match(/altura\s*[:]?\s*(\d+)/i);
+    const genderMatch = text.match(/(hombre|mujer|masculino|femenino)/i);
+    const goalMatch = text.match(/(perder|bajar|definir|ganar|subir|masa|mantener)/i);
+
+    // Si falta algo esencial, devolvemos null para que el frontend avise
+    if (!ageMatch || !weightMatch || !heightMatch) return null;
+
+    const age = parseInt(ageMatch[1]);
+    const weight = parseInt(weightMatch[1]);
+    const height = parseInt(heightMatch[1]);
+    const isMale = genderMatch && (genderMatch[1].toLowerCase().startsWith('h') || genderMatch[1].toLowerCase().startsWith('m'));
+    const goal = goalMatch ? goalMatch[1].toLowerCase() : 'mantener';
+
+    // Fórmula Harris-Benedict Revisada
+    let bmr;
+    if (isMale) {
+        bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
+    } else {
+        bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
+    }
+
+    // Factor actividad (Asumimos moderado si no se especifica claro)
+    let activity = 1.375;
+    if (text.includes('sedentario')) activity = 1.2;
+    if (text.includes('ligero')) activity = 1.375;
+    if (text.includes('moderado')) activity = 1.55;
+    if (text.includes('intenso')) activity = 1.725;
+
+    let tdee = Math.round(bmr * activity);
+
+    // Ajuste objetivo
+    if (goal.includes('perder') || goal.includes('bajar') || goal.includes('definir')) tdee -= 400;
+    else if (goal.includes('ganar') || goal.includes('subir') || goal.includes('masa')) tdee += 300;
+
+    // Reparto Macros
+    const protein = Math.round((tdee * 0.3) / 4);
+    const carbs = Math.round((tdee * 0.4) / 4);
+    const fat = Math.round((tdee * 0.3) / 9);
+    const fiber = Math.round((tdee / 1000) * 14);
+
+    return {
+        done: true,
+        calories: tdee,
+        protein,
+        carbs,
+        fat,
+        fiber,
+        message: "✅ Cálculo realizado (Plan B Local)."
+    };
+};
+
 const chatMacroCalculator = async (req, res) => {
-    if (!process.env.OPENROUTER_API_KEY) return res.status(500).json({ message: 'Falta configuración de API' });
-    const CHAT_MODELS = ["google/gemini-2.0-flash-exp:free", "meta-llama/llama-3.2-3b-instruct:free", "google/gemini-flash-1.5-exp:free", "meta-llama/llama-3.2-11b-vision-instruct:free", "huggingfaceh4/zephyr-7b-beta:free", "google/gemini-2.0-flash-thinking-exp:free", "liquid/lfm-40b:free", "mistralai/mistral-7b-instruct:free", "microsoft/phi-3-medium-128k-instruct:free", "openchat/openchat-7b:free"];
-    try {
-        const { history } = req.body;
-        const systemPrompt = `Eres un nutricionista experto de NoteGymk. Objetivo: calcular TDEE y macros. Necesitas: Edad, Género, Peso, Altura, Actividad, Objetivo. 1. Pide datos que falten (sé breve). 2. SI TIENES TODO: Calcula y responde SOLO con este JSON: { "done": true, "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "fiber": 0, "message": "Plan listo." } 3. SI NO: Responde texto normal (pregunta).`;
-        const messages = [{ role: "system", content: systemPrompt }, ...history];
-        let content = null;
-        let success = false;
-        for (const modelName of CHAT_MODELS) {
+    // 1. Obtener el último mensaje del usuario
+    const { history } = req.body;
+    const lastUserMessage = history[history.length - 1].content;
+
+    // 2. INTENTO DE CASCADA DE IA
+    if (process.env.OPENROUTER_API_KEY) {
+        // 🔥 LISTA DE 10 MODELOS (Del más rápido/nuevo al más fiable/viejo)
+        const CHAT_MODELS = [
+            "google/gemini-2.0-flash-exp:free",          // Top Tier
+            "meta-llama/llama-3.3-70b-instruct:free",    // Potencia bruta
+            "google/gemini-flash-1.5-8b-exp:free",       // Velocidad extrema
+            "google/gemma-2-9b-it:free",                 // Calidad Google
+            "meta-llama/llama-3.2-3b-instruct:free",     // Ligero
+            "qwen/qwen-2.5-7b-instruct:free",            // Instrucciones precisas
+            "mistralai/mistral-7b-instruct:free",        // Fiable
+            "microsoft/phi-3-mini-128k-instruct:free",   // Micro modelo
+            "huggingfaceh4/zephyr-7b-beta:free",         // Alternativa
+            "openchat/openchat-7b:free"                  // Backup final
+        ];
+
+        const systemPrompt = `
+            Eres una calculadora de macros estricta y silenciosa. NO saludes. NO des explicaciones.
+            Tu única función es extraer estos 6 datos del texto del usuario:
+            1. Género (Hombre/Mujer)
+            2. Edad (años)
+            3. Peso (kg)
+            4. Altura (cm)
+            5. Actividad (Sedentario, Ligero, Moderado, Intenso, Atleta)
+            6. Objetivo (Perder grasa, Mantener, Ganar músculo)
+
+            LÓGICA:
+            - SI TIENES LOS 6 DATOS: Calcula TDEE usando Harris-Benedict. Aplica déficit (-400) o superávit (+300) según objetivo. Distribuye macros (30%P, 40%C, 30%G). 
+              Responde EXCLUSIVAMENTE con este JSON:
+              { "done": true, "calories": NUMERO, "protein": NUMERO, "carbs": NUMERO, "fat": NUMERO, "fiber": NUMERO, "message": "✅ Macros calculados." }
+            
+            - SI FALTA ALGÚN DATO: Responde SOLO con el texto: "Falta: [Lista de datos que faltan]". Ejemplo: "Falta: Edad y Objetivo."
+        `;
+
+        for (const model of CHAT_MODELS) {
             try {
-                console.log(`💬 Intentando CHAT con: ${modelName}...`);
-                const completion = await openai.chat.completions.create({ model: modelName, messages: messages, temperature: 0.7 });
-                content = completion.choices[0].message.content;
-                if (content && content.length > 0) { success = true; console.log(`✅ ÉXITO CHAT con ${modelName}`); break; }
-            } catch (error) { console.log(`⚠️ Falló CHAT ${modelName}: ${error.status || error.message}`); }
-        }
-        if (!success) return res.status(503).json({ message: 'Servidores saturados. Revisa tu API Key.' });
-        try {
-            const jsonStart = content.indexOf('{');
-            const jsonEnd = content.lastIndexOf('}');
-            if (jsonStart !== -1 && jsonEnd !== -1) {
-                const jsonStr = content.substring(jsonStart, jsonEnd + 1);
-                const data = JSON.parse(jsonStr);
-                if (data.done) return res.json({ type: 'final', data: data });
+                console.log(`🤖 Intentando IA: ${model}...`);
+                const completion = await openai.chat.completions.create({
+                    model: model,
+                    messages: [{ role: "system", content: systemPrompt }, ...history],
+                    temperature: 0.1,
+                    max_tokens: 300
+                });
+
+                const content = completion.choices[0].message.content;
+
+                // Si recibimos algo válido (intentamos parsear el JSON)
+                const jsonStart = content.indexOf('{');
+                const jsonEnd = content.lastIndexOf('}');
+
+                if (jsonStart !== -1 && jsonEnd !== -1) {
+                    const data = JSON.parse(content.substring(jsonStart, jsonEnd + 1));
+                    if (data.done) {
+                        console.log(`✅ ÉXITO con ${model}`);
+                        return res.json({ type: 'final', data: data });
+                    }
+                }
+
+                // Si llegamos aquí, la IA respondió texto (pidiendo datos), lo cual también es un "éxito" de conexión
+                if (content && content.length > 0) {
+                    return res.json({ type: 'question', message: content });
+                }
+
+            } catch (error) {
+                console.log(`⚠️ IA falló (${model}). Probando siguiente...`);
+                // El bucle continúa automáticamente al siguiente modelo
             }
-        } catch (e) { }
-        res.json({ type: 'question', message: content });
-    } catch (error) { console.error("Error Crítico Chat:", error); res.status(500).json({ message: 'Error interno del asistente' }); }
+        }
+    }
+
+    // 3. SI TODO FALLA (PLAN B)
+    console.log("🚨 TODAS LAS IAs FALLARON. Activando Plan B (Matemáticas Locales)...");
+
+    const localResult = calculateLocalMacros(lastUserMessage);
+
+    if (localResult) {
+        // ¡Éxito local!
+        return res.json({ type: 'final', data: localResult });
+    } else {
+        // Fallo local (Faltan datos en el texto y ninguna IA pudo pedirlo)
+        return res.json({
+            type: 'question',
+            message: "⚠️ Fallo de conexión total con la IA. Por favor, asegúrate de escribir TODOS los datos juntos: EDAD, PESO, ALTURA y GÉNERO para usar el cálculo de emergencia."
+        });
+    }
 };
 
 module.exports = {

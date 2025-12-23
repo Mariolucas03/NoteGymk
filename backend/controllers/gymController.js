@@ -3,6 +3,10 @@ const Exercise = require('../models/Exercise');
 const WorkoutLog = require('../models/WorkoutLog');
 const DailyLog = require('../models/DailyLog');
 const levelService = require('../services/levelService');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+// Configuración Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
@@ -100,12 +104,82 @@ const seedExercises = async (req, res) => {
     }
 };
 
-// 7. GUARDAR LOG DE GYM (ARRAYS - MULTIPLE)
+// 7. GUARDAR LOG DE GYM (CON CÁLCULO IA DE CALORÍAS + INTENSIDAD)
 const saveWorkoutLog = async (req, res) => {
     try {
-        const { routineId, routineName, duration, exercises } = req.body;
+        const { routineId, routineName, duration, exercises, intensity } = req.body;
 
-        // 1. Guardar en Historial General (WorkoutLog)
+        // 1. OBTENER PESO REAL
+        const lastWeightLog = await DailyLog.findOne({
+            user: req.user._id,
+            weight: { $gt: 0 }
+        }).sort({ date: -1 });
+        const userWeight = lastWeightLog ? lastWeightLog.weight : 75;
+
+        let caloriesBurned = 0;
+
+        // 2. PREPARAR DATOS PARA LA IA
+        const exercisesDescription = exercises.map(ex => {
+            const setsDesc = ex.sets.map(s => `${s.weight}kg x ${s.reps}`).join(', ');
+            return `- ${ex.name}: [${setsDesc}]`;
+        }).join('\n');
+
+        let intensityContext = "";
+        if (intensity === 'Baja') intensityContext = "Estilo Powerlifting/Fuerza. Descansos largos (3-5 min). Frecuencia cardíaca media-baja. Gasto calórico MENOR.";
+        if (intensity === 'Media') intensityContext = "Estilo Hipertrofia estándar. Descansos medios (1-2 min). Ritmo constante.";
+        if (intensity === 'Alta') intensityContext = "Estilo Metabólico/Superseries/Crossfit. Descansos mínimos. Frecuencia cardíaca alta. Gasto calórico MAYOR.";
+
+        // --- CÁLCULO CON GEMINI ---
+        try {
+            console.log(`🤖 Gym IA: ${duration}s, ${userWeight}kg, Intensidad: ${intensity}`);
+
+            // CORREGIDO: Modelo actualizado
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+            const prompt = `
+                Calcula las calorías quemadas en esta sesión de pesas.
+                
+                DATOS CLAVE:
+                - Peso Atleta: ${userWeight} kg (DATO CRÍTICO)
+                - Duración: ${Math.floor(duration / 60)} minutos
+                - Intensidad Declarada: ${intensity} (${intensityContext})
+                
+                RUTINA REALIZADA:
+                ${exercisesDescription}
+
+                INSTRUCCIONES:
+                - Usa el peso corporal y la intensidad para ajustar el cálculo.
+                - Si es intensidad "Baja" (descansos largos), reduce la estimación considerablemente.
+                - Si es "Alta", auméntala.
+                
+                Responde ÚNICAMENTE JSON: { "calories": numero_entero }
+            `;
+
+            // 🔥 CORRECCIÓN APLICADA: FORZAR JSON 🔥
+            const result = await model.generateContent({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                }
+            });
+
+            const response = await result.response;
+            const data = JSON.parse(response.text());
+
+            caloriesBurned = Math.round(data.calories);
+            console.log(`✅ Gemini Gym calculó: ${caloriesBurned} kcal`);
+
+        } catch (aiError) {
+            console.error("⚠️ Fallo IA Gym:", aiError.message);
+            // Plan B ajustado por intensidad
+            const durationMin = duration / 60;
+            let factor = 5;
+            if (intensity === 'Baja') factor = 3.5;
+            if (intensity === 'Alta') factor = 7;
+            caloriesBurned = Math.round(durationMin * factor);
+        }
+
+        // 3. Guardar en Historial General
         const log = await WorkoutLog.create({
             user: req.user._id,
             routine: routineId,
@@ -113,19 +187,23 @@ const saveWorkoutLog = async (req, res) => {
             duration,
             exercises,
             type: 'gym',
+            intensity: intensity || 'Media',
+            caloriesBurned,
             date: new Date()
         });
 
-        // 2. Guardar en DailyLog (DÍA ACTUAL) - AHORA CON PUSH para permitir varios
+        // 4. Guardar en DailyLog
         const today = getTodayDateString();
 
         await DailyLog.findOneAndUpdate(
             { user: req.user._id, date: today },
             {
-                $push: { // USAMOS PUSH PARA AÑADIR A LA LISTA
+                $push: {
                     gymWorkouts: {
                         name: routineName,
                         duration: duration,
+                        caloriesBurned: caloriesBurned,
+                        intensity: intensity || 'Media',
                         exercises: exercises.map(ex => ({
                             name: ex.name,
                             sets: ex.sets.map(s => ({ weight: s.weight, reps: s.reps }))
@@ -137,7 +215,14 @@ const saveWorkoutLog = async (req, res) => {
             { upsert: true }
         );
 
-        res.status(201).json({ message: 'Entrenamiento guardado', log });
+        const result = await levelService.addRewards(req.user._id, 50, 15);
+
+        res.status(201).json({
+            message: `Entreno guardado: ${caloriesBurned} kcal`,
+            log,
+            user: result.user,
+            leveledUp: result.leveledUp
+        });
 
     } catch (error) {
         console.error(error);
@@ -145,12 +230,65 @@ const saveWorkoutLog = async (req, res) => {
     }
 };
 
-// 8. GUARDAR LOG DE DEPORTE (ARRAYS - MULTIPLE)
+// 8. GUARDAR LOG DE DEPORTE (CON CÁLCULO IA Y PESO REAL)
 const saveSportLog = async (req, res) => {
     try {
         const { name, time, intensity, distance } = req.body;
 
-        // 1. Historial General
+        const lastWeightLog = await DailyLog.findOne({
+            user: req.user._id,
+            weight: { $gt: 0 }
+        }).sort({ date: -1 });
+
+        const userWeight = lastWeightLog ? lastWeightLog.weight : 75;
+
+        let caloriesBurned = 0;
+
+        // --- CÁLCULO CON GEMINI ---
+        try {
+            console.log(`🤖 Preguntando a Gemini... Actividad: ${name}, ${time} min, ${intensity}, Peso: ${userWeight}kg`);
+
+            // CORREGIDO: Modelo actualizado
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+            const prompt = `
+                Actúa como un entrenador deportivo fisiólogo.
+                Calcula las calorías quemadas para la siguiente actividad.
+                Sé preciso considerando el peso corporal (factor clave).
+
+                DATOS:
+                - Actividad: "${name}"
+                - Duración: ${time} minutos
+                - Intensidad: ${intensity}
+                - Peso del Atleta: ${userWeight} kg
+                - Distancia (opcional): ${distance || 'No especificada'}
+
+                Responde ÚNICAMENTE con este JSON: 
+                { "calories": numero_entero_estimado }
+            `;
+
+            // 🔥 CORRECCIÓN APLICADA: FORZAR JSON 🔥
+            const result = await model.generateContent({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                }
+            });
+
+            const response = await result.response;
+            const data = JSON.parse(response.text());
+
+            caloriesBurned = Math.round(data.calories);
+            console.log(`✅ Gemini calculó: ${caloriesBurned} kcal (basado en ${userWeight}kg)`);
+
+        } catch (aiError) {
+            console.error("⚠️ Fallo IA Calorías, usando fórmula matemática de respaldo:", aiError.message);
+            // Plan B: Fórmula MET aproximada
+            const mets = intensity === 'Alta' ? 10 : intensity === 'Media' ? 7 : 4;
+            caloriesBurned = Math.round((mets * 3.5 * userWeight / 200) * time);
+        }
+
+        // 2. Historial General
         const log = await WorkoutLog.create({
             user: req.user._id,
             routineName: name,
@@ -158,21 +296,23 @@ const saveSportLog = async (req, res) => {
             intensity,
             distance,
             type: 'sport',
+            caloriesBurned: caloriesBurned,
             date: new Date()
         });
 
-        // 2. Daily Log
+        // 3. Daily Log
         const today = getTodayDateString();
 
         await DailyLog.findOneAndUpdate(
             { user: req.user._id, date: today },
             {
-                $push: { // USAMOS PUSH PARA AÑADIR A LA LISTA
+                $push: {
                     sportWorkouts: {
                         routineName: name,
                         duration: time,
                         intensity,
                         distance,
+                        caloriesBurned: caloriesBurned,
                         timestamp: new Date()
                     }
                 }
@@ -183,7 +323,7 @@ const saveSportLog = async (req, res) => {
         const result = await levelService.addRewards(req.user._id, 30, 10);
 
         res.status(201).json({
-            message: 'Deporte registrado',
+            message: `Registrado: ${caloriesBurned} kcal`,
             log,
             user: result.user,
             leveledUp: result.leveledUp
@@ -334,7 +474,6 @@ const getRoutineHistory = async (req, res) => {
                     // 2. Calcular PR (Basado en 1RM pero guardando Kg x Reps)
                     ex.sets.forEach(set => {
                         const rm = calc1RM(set.weight, set.reps);
-                        // Si este set es mejor que el actual record...
                         if (rm > stats[ex.name].bestSet.value1RM) {
                             stats[ex.name].bestSet = {
                                 weight: set.weight,
@@ -360,7 +499,6 @@ const seedFakeHistory = async (req, res) => {
     try {
         const userId = req.user._id;
 
-        // 1. Buscar TODOS los ejercicios disponibles (Sistema + Usuario)
         const allExercises = await Exercise.find({
             $or: [{ user: userId }, { isCustom: false }, { user: null }]
         });
@@ -397,7 +535,7 @@ const seedFakeHistory = async (req, res) => {
             date: dateRecent,
             exercises: targetNames.map(name => ({
                 name: name,
-                sets: [{ weight: 25, reps: 10 }, { weight: 30, reps: 8 }] // ¡Más peso!
+                sets: [{ weight: 25, reps: 10 }, { weight: 30, reps: 8 }]
             }))
         });
 
@@ -416,27 +554,23 @@ const getExerciseHistory = async (req, res) => {
 
         if (!exerciseName) return res.status(400).json({ message: 'Falta el nombre del ejercicio' });
 
-        // Buscamos logs que contengan ese ejercicio, ordenados por fecha
         const logs = await WorkoutLog.find({
             user: userId,
             'exercises.name': exerciseName
         }).sort({ date: 1 });
 
         const data = logs.map(log => {
-            // Buscamos el ejercicio dentro del log
             const exData = log.exercises.find(e => e.name === exerciseName);
             if (!exData) return null;
 
-            // Calculamos el mejor 1RM de ESA sesión
             let max1RM = 0;
             let maxWeight = 0;
 
             exData.sets.forEach(s => {
                 const w = s.weight || 0;
                 const r = s.reps || 0;
-                if (w > maxWeight) maxWeight = w; // Peso máximo levantado
+                if (w > maxWeight) maxWeight = w;
 
-                // Fórmula Epley
                 const rm = r === 1 ? w : w * (1 + r / 30);
                 if (rm > max1RM) max1RM = rm;
             });
@@ -461,29 +595,24 @@ const getBodyStatus = async (req, res) => {
     try {
         const userId = req.user._id;
 
-        // Miramos los últimos 30 días (para que el avatar "se apague" si dejas de entrenar)
         const sinceDate = new Date();
         sinceDate.setDate(sinceDate.getDate() - 30);
 
-        // 1. Obtener todos los logs recientes
         const logs = await WorkoutLog.find({
             user: userId,
             type: 'gym',
             date: { $gte: sinceDate }
         });
 
-        // 2. Obtener mapa de ejercicios y sus músculos
         const allExercises = await Exercise.find({
             $or: [{ user: userId }, { isCustom: false }, { user: null }]
         });
 
-        // Crear diccionario: "Press Banca" -> "Pecho"
         const exerciseToMuscle = {};
         allExercises.forEach(ex => {
             exerciseToMuscle[ex.name] = ex.muscle;
         });
 
-        // 3. Sumar Sets por Músculo
         const muscleStats = {
             'Pecho': 0, 'Espalda': 0, 'Pierna': 0,
             'Hombro': 0, 'Bíceps': 0, 'Tríceps': 0, 'Abdomen': 0
@@ -493,8 +622,6 @@ const getBodyStatus = async (req, res) => {
             log.exercises.forEach(ex => {
                 const muscle = exerciseToMuscle[ex.name];
                 if (muscle && muscleStats[muscle] !== undefined) {
-                    // Sumamos el número de series (sets) como indicador de "trabajo"
-                    // Si prefieres volumen (kg), cambia ex.sets.length por el cálculo de peso
                     muscleStats[muscle] += ex.sets.length;
                 }
             });

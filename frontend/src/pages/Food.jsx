@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Settings, X, Save, Bot, Send, ChevronRight, LayoutGrid, Flame, Wheat, Droplet, Leaf, Plus } from 'lucide-react';
+import { Settings, X, Save, Bot, Send, ChevronRight, Flame, Wheat, Droplet, Leaf, Plus } from 'lucide-react';
 import api from '../services/api';
 import FoodSearchModal from '../components/food/FoodSearchModal';
 import Toast from '../components/common/Toast';
@@ -38,7 +38,6 @@ export default function Food() {
 
     // Input Manual
     const [manualCalories, setManualCalories] = useState(goals.calories);
-    const [newCategoryName, setNewCategoryName] = useState('');
 
     // Carga inicial
     useEffect(() => { fetchLog(); }, []);
@@ -71,7 +70,6 @@ export default function Food() {
     };
 
     // --- GUARDADO MANUAL REPARADO ---
-    // Ahora calcula los macros automáticamente al guardar solo calorías
     const handleSaveManual = async () => {
         const kcal = parseInt(manualCalories);
         if (isNaN(kcal) || kcal < 500) return showToast("Introduce calorías válidas", "error");
@@ -80,7 +78,7 @@ export default function Food() {
         const p = Math.round((kcal * 0.3) / 4);
         const c = Math.round((kcal * 0.4) / 4);
         const f = Math.round((kcal * 0.3) / 9);
-        const fib = Math.round(kcal / 1000 * 14); // Estándar de 14g fibra/1000kcal
+        const fib = Math.round(kcal / 1000 * 14);
 
         const newMacros = {
             calories: kcal,
@@ -133,9 +131,7 @@ export default function Food() {
         }
     };
 
-    // --- INICIO DE CHAT CON INSTRUCCIONES FIJAS ---
     const startChat = () => {
-        // Mensaje Anclado Claro
         setChatHistory([{
             role: 'assistant',
             content: `📝 DATOS NECESARIOS (Escríbelos todos juntos):
@@ -155,17 +151,6 @@ Ejemplo: "Hombre, 25 años, 80kg, 180cm, sedentario, perder peso"`
     const handleOpenAdd = (mealId) => {
         setActiveMealId(mealId);
         setShowSearch(true);
-    };
-
-    const handleCreateCategory = async () => {
-        if (!newCategoryName) return;
-        try {
-            await api.post('/food/category', { name: newCategoryName });
-            fetchLog();
-            setConfigModal({ show: false, mode: 'manual' });
-            setNewCategoryName('');
-            showToast("Categoría añadida");
-        } catch (error) { showToast("Error", "error"); }
     };
 
     if (loading) return <div className="text-center py-20 text-gray-500 animate-pulse">Cargando diario...</div>;
@@ -261,10 +246,6 @@ Ejemplo: "Hombre, 25 años, 80kg, 180cm, sedentario, perder peso"`
                 })}
             </div>
 
-            <button onClick={() => setConfigModal({ show: true, mode: 'category' })} className="w-full mt-6 py-4 border-2 border-dashed border-gray-800 rounded-2xl flex items-center justify-center gap-2 text-gray-500 font-bold hover:text-white hover:border-gray-600 hover:bg-gray-900 transition-all active:scale-95 uppercase text-xs tracking-widest">
-                <LayoutGrid size={18} /> Nueva Categoría
-            </button>
-
             {/* MODAL SEARCH */}
             {showSearch && (
                 <FoodSearchModal
@@ -282,7 +263,7 @@ Ejemplo: "Hombre, 25 años, 80kg, 180cm, sedentario, perder peso"`
 
                         <div className="p-4 border-b border-gray-800 flex justify-between items-center">
                             <h3 className="text-lg font-bold text-white">
-                                {configModal.mode === 'ai' ? 'Nutricionista IA' : configModal.mode === 'category' ? 'Nueva Categoría' : 'Ajustes'}
+                                {configModal.mode === 'ai' ? 'Nutricionista IA' : 'Ajustes'}
                             </h3>
                             <button onClick={() => setConfigModal({ ...configModal, show: false })} className="text-gray-400 hover:text-white"><X size={20} /></button>
                         </div>
@@ -314,15 +295,6 @@ Ejemplo: "Hombre, 25 años, 80kg, 180cm, sedentario, perder peso"`
                                             <Save size={18} /> Guardar Cambios
                                         </button>
                                     </div>
-                                </div>
-                            )}
-
-                            {/* CATEGORÍA */}
-                            {configModal.mode === 'category' && (
-                                <div>
-                                    <p className="text-xs text-gray-500 uppercase font-bold mb-2">Nombre</p>
-                                    <input autoFocus type="text" placeholder="Ej: Merienda" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} className="w-full bg-gray-950 text-white text-xl font-bold p-4 rounded-xl border border-gray-800 focus:border-blue-500 outline-none" />
-                                    <button onClick={handleCreateCategory} className="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg transition-colors">Crear</button>
                                 </div>
                             )}
 

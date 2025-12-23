@@ -5,34 +5,26 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
 
-    // --- ESTADÍSTICAS RPG ---
-    stats: {
-        level: { type: Number, default: 1 },
-        currentXP: { type: Number, default: 0 },
-        nextLevelXP: { type: Number, default: 100 },
-        coins: { type: Number, default: 50 },
-
-        // 🔥 NUEVA MONEDA (Fichas para juegos)
-        gameCoins: { type: Number, default: 500 },
-
-        hp: { type: Number, default: 100 },
-        maxHp: { type: Number, default: 100 }
+    // Datos Físicos
+    physicalStats: {
+        age: { type: Number },
+        height: { type: Number }, // cm
+        gender: { type: String, enum: ['male', 'female'] }
     },
 
-    // Alias en raíz para compatibilidad
-    coins: { type: Number, default: 50 },
+    // --- ESTADÍSTICAS RPG (Unificadas en la raíz para acceso rápido) ---
     level: { type: Number, default: 1 },
     currentXP: { type: Number, default: 0 },
     nextLevelXP: { type: Number, default: 100 },
-    lives: { type: Number, default: 100 },
+    coins: { type: Number, default: 50 },      // Moneda Principal
+    gameCoins: { type: Number, default: 500 }, // Fichas Casino
 
-    redemptionMission: { type: String, default: null },
+    // Salud / Vidas
+    hp: { type: Number, default: 100 },
+    maxHp: { type: Number, default: 100 },
+    lives: { type: Number, default: 100 }, // NOTA: ¿Usas 'hp' o 'lives'? Decide una. Sugiero 'hp'.
 
-    inventory: [{
-        item: { type: mongoose.Schema.Types.ObjectId, ref: 'ShopItem' },
-        quantity: { type: Number, default: 1 }
-    }],
-
+    // Configuración Nutricional
     macros: {
         calories: { type: Number, default: 2100 },
         protein: { type: Number, default: 150 },
@@ -41,17 +33,44 @@ const userSchema = new mongoose.Schema({
         fiber: { type: Number, default: 30 }
     },
 
+    // Inventario (Referencia)
+    inventory: [{
+        item: { type: mongoose.Schema.Types.ObjectId, ref: 'ShopItem' },
+        quantity: { type: Number, default: 1 }
+    }],
+
+    // Sistema de Racha
     streak: {
         current: { type: Number, default: 1 },
         lastLogDate: { type: Date, default: Date.now }
     },
 
+    // Recompensas Diarias
     dailyRewards: {
         claimedDays: { type: [Number], default: [] },
         lastClaimDate: { type: Date }
-    }
+    },
+
+    // Castigo/Redención
+    redemptionMission: { type: String, default: null },
+
 }, {
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true }, // Para que el frontend reciba id y _id si es necesario
+    toObject: { virtuals: true }
+});
+
+// Virtual para compatibilidad si el frontend busca user.stats.coins
+userSchema.virtual('stats').get(function () {
+    return {
+        level: this.level,
+        currentXP: this.currentXP,
+        nextLevelXP: this.nextLevelXP,
+        coins: this.coins,
+        gameCoins: this.gameCoins,
+        hp: this.hp,
+        maxHp: this.maxHp
+    };
 });
 
 module.exports = mongoose.model('User', userSchema);

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Scale, X, Save, TrendingUp } from 'lucide-react';
+import { Scale, X, Save, TrendingUp, History } from 'lucide-react';
 import api from '../../services/api';
 
-export default function WeightWidget({ initialWeight, onUpdate }) {
+export default function WeightWidget({ initialWeight, onUpdate, readOnly = false }) {
     const [weight, setWeight] = useState(initialWeight || 0);
     const [history, setHistory] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
@@ -11,19 +11,18 @@ export default function WeightWidget({ initialWeight, onUpdate }) {
     const [loading, setLoading] = useState(false);
     const [hoveredPoint, setHoveredPoint] = useState(null);
 
-    // 1. Sincronizar con props si cambian desde fuera (Home)
+    // 1. Sincronizar con props
     useEffect(() => {
         if (initialWeight > 0) setWeight(initialWeight);
     }, [initialWeight]);
 
-    // 2. Cargar historial SOLO al abrir el modal (Optimización)
+    // 2. Cargar historial al abrir
     useEffect(() => {
         if (isOpen) fetchHistory();
     }, [isOpen]);
 
     const fetchHistory = async () => {
         try {
-            // ✅ AHORA SÍ EXISTE ESTA RUTA EN EL BACKEND
             const res = await api.get('/daily/history');
             setHistory(res.data);
         } catch (error) {
@@ -37,19 +36,10 @@ export default function WeightWidget({ initialWeight, onUpdate }) {
         setLoading(true);
         try {
             const val = parseFloat(newWeight);
-            // 1. Guardar en Backend (Log de hoy)
             await api.put('/daily', { type: 'weight', value: val });
-
-            // 2. Actualizar estado local
             setWeight(val);
-
-            // 3. Notificar al padre (Home) para que actualice su estado global
             if (onUpdate) onUpdate(val);
-
-            // 4. Refrescar historial para ver el nuevo punto en la gráfica
             await fetchHistory();
-
-            // Limpiar input (No cerramos modal para que veas el cambio)
             setNewWeight('');
         } catch (error) {
             console.error("Error guardando peso", error);
@@ -58,26 +48,64 @@ export default function WeightWidget({ initialWeight, onUpdate }) {
         }
     };
 
-    // Helper: Formato DD/MM
     const formatDateLabel = (dateString) => {
         if (!dateString) return '';
         const [year, month, day] = dateString.split('-');
         return `${day}/${month}`;
     };
 
-    // --- GRÁFICA SVG PERSONALIZADA ---
+    // --- GRÁFICA SVG PERSONALIZADA (FILTRADA) ---
     const renderLineChart = () => {
         if (!history || history.length < 2) {
             return (
                 <div className="h-40 flex flex-col items-center justify-center text-gray-500 text-xs italic border border-gray-800 rounded-xl bg-black/20">
-                    <p>Registra tu peso hoy y mañana</p>
-                    <p>para ver tu progreso.</p>
+                    <p>Faltan datos históricos</p>
+                    <p>para generar la gráfica.</p>
                 </div>
             );
         }
 
-        // Usamos los últimos 7 registros
-        const data = history.slice(-7);
+        // --- FILTRO INTELIGENTE: SOLO CAMBIOS ---
+        // 1. Siempre guardamos el primer dato.
+        // 2. Solo guardamos los siguientes si el peso es DIFERENTE al anterior.
+        // 3. Siempre guardamos el ÚLTIMO dato (hoy) para cerrar la gráfica.
+
+        const filteredData = [];
+        if (history.length > 0) {
+            filteredData.push(history[0]); // El inicio
+
+            for (let i = 1; i < history.length; i++) {
+                const current = history[i];
+                const prev = history[i - 1];
+
+                // Si hubo un cambio de peso, lo añadimos
+                if (current.weight !== prev.weight) {
+                    filteredData.push(current);
+                }
+            }
+
+            // Asegurarnos de que el último día (hoy) siempre esté, incluso si no cambió
+            const lastOriginal = history[history.length - 1];
+            const lastFiltered = filteredData[filteredData.length - 1];
+
+            // Si el último que añadimos NO es el último del historial real, lo añadimos
+            if (lastOriginal.date !== lastFiltered.date) {
+                filteredData.push(lastOriginal);
+            }
+        }
+
+        // Si después de filtrar nos quedan menos de 2 puntos, mostramos mensaje
+        if (filteredData.length < 2) {
+            return (
+                <div className="h-40 flex flex-col items-center justify-center text-gray-500 text-xs italic border border-gray-800 rounded-xl bg-black/20">
+                    <p>Peso estable.</p>
+                    <p>Registra un cambio para ver gráfica.</p>
+                </div>
+            );
+        }
+
+        // Usamos los últimos 7 puntos SIGNIFICATIVOS (Cambios)
+        const data = filteredData.slice(-7);
 
         const width = 300;
         const height = 150;
@@ -87,12 +115,10 @@ export default function WeightWidget({ initialWeight, onUpdate }) {
         let minW = Math.min(...weights);
         let maxW = Math.max(...weights);
 
-        // Evitar división por cero si el peso es constante
         if (minW === maxW) {
             minW -= 1;
             maxW += 1;
         } else {
-            // Margen visual
             minW -= 0.5;
             maxW += 0.5;
         }
@@ -174,7 +200,8 @@ export default function WeightWidget({ initialWeight, onUpdate }) {
                     <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-blue-400 transition-colors">
                         <Scale size={12} /> Peso
                     </h3>
-                    <TrendingUp size={14} className="text-gray-600 group-hover:text-blue-500 transition-colors" />
+                    {/* Icono cambia según modo */}
+                    {readOnly ? <History size={14} className="text-gray-600 group-hover:text-blue-500" /> : <TrendingUp size={14} className="text-gray-600 group-hover:text-blue-500" />}
                 </div>
 
                 <div className="flex flex-col items-center justify-center flex-1 z-10 mt-2">
@@ -185,11 +212,11 @@ export default function WeightWidget({ initialWeight, onUpdate }) {
                         <span className="text-sm font-bold text-gray-500 uppercase">kg</span>
                     </div>
                     <p className="text-[10px] text-gray-500 mt-1">
-                        {weight > 0 ? "Actualizado" : "Toca para registrar"}
+                        {/* Texto cambia según modo */}
+                        {readOnly ? "Ver historial" : (weight > 0 ? "Actualizado" : "Toca para registrar")}
                     </p>
                 </div>
 
-                {/* Decoración Fondo */}
                 <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-blue-600/5 rounded-full blur-xl group-hover:bg-blue-600/10 transition-all" />
             </div>
 
@@ -201,33 +228,36 @@ export default function WeightWidget({ initialWeight, onUpdate }) {
                     <div className="relative bg-gray-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl border-t sm:border border-gray-700 shadow-2xl p-6 flex flex-col animate-in slide-in-from-bottom duration-300 z-10 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h2 className="text-2xl font-bold text-white">Control de Peso</h2>
+                                <h2 className="text-2xl font-bold text-white">{readOnly ? 'Historial de Peso' : 'Control de Peso'}</h2>
                                 <p className="text-blue-400 text-sm">Tu progreso físico</p>
                             </div>
                             <button onClick={() => setIsOpen(false)} className="bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
                         </div>
 
-                        <form onSubmit={handleSave} className="mb-8">
-                            <div className="relative">
-                                <input
-                                    type="number" step="0.1"
-                                    placeholder={weight > 0 ? weight.toString() : "0.0"}
-                                    autoFocus
-                                    value={newWeight}
-                                    onChange={(e) => setNewWeight(e.target.value)}
-                                    className="w-full bg-black/50 border border-gray-700 rounded-2xl py-4 pl-6 pr-16 text-4xl font-bold text-white focus:outline-none focus:border-blue-500 transition-all placeholder-gray-600"
-                                />
-                                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-xl">kg</span>
-                            </div>
-                            <button type="submit" disabled={loading || !newWeight} className="w-full mt-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 disabled:opacity-50">
-                                {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={20} />}
-                                Guardar Peso de Hoy
-                            </button>
-                        </form>
+                        {/* --- SOLO MOSTRAMOS FORMULARIO SI NO ES READONLY --- */}
+                        {!readOnly && (
+                            <form onSubmit={handleSave} className="mb-8">
+                                <div className="relative">
+                                    <input
+                                        type="number" step="0.1"
+                                        placeholder={weight > 0 ? weight.toString() : "0.0"}
+                                        autoFocus
+                                        value={newWeight}
+                                        onChange={(e) => setNewWeight(e.target.value)}
+                                        className="w-full bg-black/50 border border-gray-700 rounded-2xl py-4 pl-6 pr-16 text-4xl font-bold text-white focus:outline-none focus:border-blue-500 transition-all placeholder-gray-600"
+                                    />
+                                    <span className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-xl">kg</span>
+                                </div>
+                                <button type="submit" disabled={loading || !newWeight} className="w-full mt-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 disabled:opacity-50">
+                                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={20} />}
+                                    Guardar Peso de Hoy
+                                </button>
+                            </form>
+                        )}
 
                         <div className="bg-black/30 rounded-2xl p-4 border border-gray-800/50">
                             <div className="flex justify-between items-center mb-4">
-                                <h4 className="text-xs text-gray-500 font-bold uppercase tracking-wider">Últimos 7 registros</h4>
+                                <h4 className="text-xs text-gray-500 font-bold uppercase tracking-wider">Tendencia (Cambios significativos)</h4>
                                 {history.length > 0 && (
                                     <span className={`text-xs font-bold ${history[history.length - 1]?.weight < history[0]?.weight ? 'text-green-400' : 'text-gray-400'}`}>
                                         {history.length > 1 ? `${(history[history.length - 1].weight - history[0].weight).toFixed(1)} kg total` : ''}

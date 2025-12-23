@@ -1,31 +1,17 @@
-// Calcula la recompensa para un día específico (1, 2, 5, 100...)
 export const getRewardForDay = (day) => {
-    let type = 'normal';
-    let coins = 50;
-    let xp = 20;
-    let icon = '💰';
+    // Lógica visual: Debe coincidir con el backend
+    let coins = day; // 1 moneda día 1, 2 día 2...
+    let xp = day * 10;
 
-    // Lógica: Cada día suma un poco más
-    // Día 7, 14, 21... (Semanal): Premio Raro
-    if (day % 7 === 0) {
-        type = 'rare';
-        coins = 150;
-        xp = 100;
-        icon = '🎁';
-    }
-    // Día 30, 60... (Mensual): Premio Épico
-    else if (day % 30 === 0) {
-        type = 'epic';
-        coins = 500;
-        xp = 250;
-        icon = '👑';
-    }
-    // Días normales
-    else {
-        // Un pequeño incremento cada día para motivar
-        coins += (day * 2);
-        xp += day;
+    // Bonus visual del 7º día
+    if (day === 7) {
+        coins += 5;
+        xp += 50;
     }
 
-    return { day, type, coins, xp, icon };
+    return {
+        coins,
+        xp,
+        image: `/assets/rewards/day${day}.png` // (Si usas imágenes)
+    };
 };

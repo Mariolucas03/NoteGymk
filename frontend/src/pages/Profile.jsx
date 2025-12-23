@@ -3,9 +3,9 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
     User, Trophy, Coins, Activity, Dumbbell, Utensils,
     X, CheckCircle, Clock, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Zap,
-    LogOut, Gamepad2, Star, MapPin, Gauge,
+    LogOut, Gamepad2, Star, MapPin,
     // Iconos Comida
-    Sunrise, Sun, Sunset, Moon, Coffee
+    Sunrise, Sun, Sunset, Moon, Coffee, Flame, HeartCrack, ArrowRightLeft
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -21,18 +21,19 @@ import MissionsWidget from '../components/widgets/MissionsWidget';
 import SportWidget from '../components/widgets/SportWidget';
 import GainsWidget from '../components/widgets/GainsWidget';
 import WeeklyWidget from '../components/widgets/WeeklyWidget';
-import RPGBody from '../components/profile/RPGBody';
+import KcalBalanceWidget from '../components/widgets/KcalBalanceWidget';
 
-// --- NUEVO COMPONENTE DE ESTADÍSTICAS ---
+// --- COMPONENTES EXCLUSIVOS DE PERFIL ---
+import RPGBody from '../components/profile/RPGBody';
 import ProfileStats from '../components/profile/ProfileStats';
 
 // ==========================================
-// SUB-COMPONENTES MODALES
+// 1. MODALES DE DETALLE (SOLO LECTURA)
 // ==========================================
 
+// Detalle Deporte
 function SportDetailsModal({ workouts, onClose }) {
     const [activeTab, setActiveTab] = useState(0);
-
     if (!workouts || workouts.length === 0) return null;
     const current = workouts[activeTab];
 
@@ -40,54 +41,80 @@ function SportDetailsModal({ workouts, onClose }) {
         <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
             <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
                 <div className="flex justify-between items-center mb-4 shrink-0">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                        <Activity className="text-green-500" /> Historial Deportes
-                    </h2>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2"><Activity className="text-green-500" /> Historial Deporte</h2>
                     <button onClick={onClose} className="bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
                 </div>
-
                 {workouts.length > 1 && (
                     <div className="flex gap-2 overflow-x-auto mb-4 pb-2 border-b border-gray-800">
                         {workouts.map((w, idx) => (
-                            <button
-                                key={idx}
-                                onClick={() => setActiveTab(idx)}
-                                className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${activeTab === idx ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                                    }`}
-                            >
-                                {w.routineName || `Actividad ${idx + 1}`}
-                            </button>
+                            <button key={idx} onClick={() => setActiveTab(idx)} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${activeTab === idx ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>{w.routineName || `Actividad ${idx + 1}`}</button>
                         ))}
                     </div>
                 )}
-
-                <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300 key={activeTab}">
+                <div className="space-y-4 overflow-y-auto custom-scrollbar">
                     <div className="text-center">
                         <h3 className="text-2xl font-black text-white uppercase mb-1">{current.routineName}</h3>
                         <div className="flex justify-center gap-2">
-                            <span className="text-xs bg-gray-800 px-2 py-1 rounded text-gray-400 font-mono">
-                                {new Date(current.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            <span className="text-xs bg-green-900/30 text-green-400 border border-green-500/30 px-2 py-1 rounded font-bold capitalize">
-                                {current.intensity}
-                            </span>
+                            <span className="text-xs bg-gray-800 px-2 py-1 rounded text-gray-400 font-mono">{new Date(current.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="text-xs bg-green-900/30 text-green-400 border border-green-500/30 px-2 py-1 rounded font-bold capitalize">{current.intensity}</span>
                         </div>
                     </div>
-
                     <div className="grid grid-cols-2 gap-3 mt-4">
-                        <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800 text-center">
-                            <span className="text-blue-500 text-[10px] font-bold uppercase block mb-1 flex justify-center gap-1"><MapPin size={10} /> DISTANCIA</span>
-                            <span className="text-white font-bold text-xl">{current.distance || 0} km</span>
-                        </div>
-                        <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800 text-center">
-                            <span className="text-orange-500 text-[10px] font-bold uppercase block mb-1 flex justify-center gap-1"><Clock size={10} /> TIEMPO</span>
-                            <span className="text-white font-bold text-xl">{current.duration} min</span>
-                        </div>
+                        <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800 text-center"><span className="text-blue-500 text-[10px] font-bold uppercase block mb-1 flex justify-center gap-1"><MapPin size={10} /> DISTANCIA</span><span className="text-white font-bold text-xl">{current.distance || 0} km</span></div>
+                        <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800 text-center"><span className="text-orange-500 text-[10px] font-bold uppercase block mb-1 flex justify-center gap-1"><Clock size={10} /> TIEMPO</span><span className="text-white font-bold text-xl">{current.duration} min</span></div>
                     </div>
+                    <div className="bg-gray-800/50 p-4 rounded-xl text-center"><span className="text-gray-500 text-xs">Calorías Quemadas</span><p className="text-2xl font-black text-white">{current.caloriesBurned} kcal</p></div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
-                    <div className="bg-gray-800/50 p-4 rounded-xl text-center">
-                        <span className="text-gray-500 text-xs">Calorías Quemadas (Aprox)</span>
-                        <p className="text-2xl font-black text-white">{Math.round(current.duration * (current.intensity === 'Alta' ? 10 : current.intensity === 'Media' ? 7 : 4))} kcal</p>
+// Detalle Gym
+function GymDetailsModal({ workouts, onClose }) {
+    const [activeTab, setActiveTab] = useState(0);
+    if (!workouts || workouts.length === 0) return null;
+    const current = workouts[activeTab];
+    const totalVolume = current.exercises?.reduce((t, e) => t + e.sets.reduce((s, st) => s + (st.weight * st.reps), 0), 0);
+
+    // Estimación Kcal Fallback
+    const durationMin = Math.max(1, Math.floor((current.duration || 0) / 60));
+    let intensityFactor = 5;
+    if (current.intensity === 'Baja') intensityFactor = 3.5;
+    if (current.intensity === 'Alta') intensityFactor = 7.5;
+    const estimatedKcal = Math.round(durationMin * intensityFactor);
+    const finalKcal = current.caloriesBurned > 0 ? current.caloriesBurned : estimatedKcal;
+
+    return (
+        <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+            <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
+                <div className="flex justify-between items-center mb-4 shrink-0">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2"><Dumbbell className="text-blue-500" /> Historial Gym</h2>
+                    <button onClick={onClose} className="bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
+                </div>
+                {workouts.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto mb-4 pb-2 border-b border-gray-800 shrink-0 custom-scrollbar">
+                        {workouts.map((w, idx) => (
+                            <button key={idx} onClick={() => setActiveTab(idx)} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${activeTab === idx ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>{w.name || `Rutina ${idx + 1}`}</button>
+                        ))}
+                    </div>
+                )}
+                <div className="flex-1 overflow-y-auto custom-scrollbar animate-in slide-in-from-right-4 fade-in duration-300 key={activeTab}">
+                    <div className="flex justify-between items-end mb-4 px-1">
+                        <div><h3 className="font-bold text-white text-xl">{current.name}</h3><span className="text-xs text-gray-500 flex items-center gap-1"><Clock size={12} /> {Math.floor(current.duration / 60)} min</span></div>
+                        <span className="bg-blue-900/30 text-blue-400 text-xs font-bold px-2 py-1 rounded border border-blue-500/30">{current.exercises?.length || 0} Ejercicios</span>
+                    </div>
+                    <div className="space-y-3">
+                        {current.exercises?.map((ex, i) => (
+                            <div key={i} className="bg-gray-950 p-3 rounded-xl border border-gray-800">
+                                <div className="flex justify-between mb-2"><span className="text-gray-200 font-bold text-sm">{ex.name}</span><span className="text-gray-500 text-xs font-mono">{ex.sets.length} Sets</span></div>
+                                <div className="flex flex-wrap gap-2">{ex.sets.map((s, j) => (<div key={j} className="bg-gray-900 px-2 py-1 rounded text-xs text-gray-400 border border-gray-800"><span className="text-white font-bold">{s.weight}kg</span> x {s.reps}</div>))}</div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-gray-800 grid grid-cols-2 gap-4">
+                        <div className="text-center"><p className="text-xs text-gray-500 uppercase font-bold">Volumen Total</p><p className="text-xl font-black text-white">{totalVolume.toLocaleString()} <span className="text-sm font-normal text-gray-500">kg</span></p></div>
+                        <div className="text-center border-l border-gray-800"><p className="text-xs text-orange-500 uppercase font-bold flex items-center justify-center gap-1"><Flame size={12} /> Kcal Aprox</p><p className="text-xl font-black text-orange-400">{finalKcal}</p></div>
                     </div>
                 </div>
             </div>
@@ -95,72 +122,71 @@ function SportDetailsModal({ workouts, onClose }) {
     );
 }
 
-function GymDetailsModal({ workouts, onClose }) {
-    const [activeTab, setActiveTab] = useState(0);
-
-    if (!workouts || workouts.length === 0) return null;
-    const current = workouts[activeTab];
+// Detalle Balance
+function BalanceDetailsModal({ data, onClose }) {
+    const intake = data.nutrition?.totalKcal || data.totalKcal || 0;
+    const sportBurn = data.sportWorkouts?.reduce((acc, curr) => acc + (curr.caloriesBurned || 0), 0) || 0;
+    const gymBurn = data.gymWorkouts?.reduce((acc, curr) => acc + (curr.caloriesBurned || 0), 0) || 0;
+    const totalBurned = sportBurn + gymBurn;
+    const net = intake - totalBurned;
 
     return (
         <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
-                <div className="flex justify-between items-center mb-4 shrink-0">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                        <Dumbbell className="text-blue-500" /> Historial Gym
-                    </h2>
-                    <button onClick={onClose} className="bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
+            <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+                <button onClick={onClose} className="absolute top-4 right-4 bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white z-20"><X size={20} /></button>
+                <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><ArrowRightLeft className="text-purple-500" /> Balance del Día</h2>
+                <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl border border-gray-800 mb-6">
+                    <div className="text-center"><span className="text-xs text-gray-500 font-bold uppercase block mb-1">Neto</span><span className={`text-3xl font-black ${net > 0 ? 'text-white' : 'text-green-400'}`}>{net > 0 ? '+' : ''}{Math.round(net)}</span></div>
+                    <div className="h-10 w-[1px] bg-gray-700"></div>
+                    <div className="text-center"><span className="text-xs text-gray-500 font-bold uppercase block mb-1">Estado</span><span className="text-sm font-bold text-gray-300">{net > 500 ? 'Superávit' : net < -500 ? 'Déficit' : 'Mant.'}</span></div>
                 </div>
-
-                {workouts.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto mb-4 pb-2 border-b border-gray-800 shrink-0 custom-scrollbar">
-                        {workouts.map((w, idx) => (
-                            <button
-                                key={idx}
-                                onClick={() => setActiveTab(idx)}
-                                className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${activeTab === idx ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                                    }`}
-                            >
-                                {w.name || `Rutina ${idx + 1}`}
-                            </button>
-                        ))}
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gray-950/50 p-4 rounded-2xl border border-blue-900/30">
+                        <div className="flex items-center gap-2 mb-3 text-blue-400 border-b border-blue-900/30 pb-2"><Utensils size={16} /> <span className="text-xs font-black uppercase">Ingesta</span></div>
+                        <span className="text-lg font-black text-blue-400">+{Math.round(intake)}</span>
                     </div>
-                )}
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar animate-in slide-in-from-right-4 fade-in duration-300 key={activeTab}">
-                    <div className="flex justify-between items-end mb-4 px-1">
-                        <div>
-                            <h3 className="font-bold text-white text-xl">{current.name}</h3>
-                            <span className="text-xs text-gray-500 flex items-center gap-1"><Clock size={12} /> {Math.floor(current.duration / 60)} min</span>
-                        </div>
-                        <span className="bg-blue-900/30 text-blue-400 text-xs font-bold px-2 py-1 rounded border border-blue-500/30">
-                            {current.exercises?.length || 0} Ejercicios
-                        </span>
+                    <div className="bg-gray-950/50 p-4 rounded-2xl border border-orange-900/30">
+                        <div className="flex items-center gap-2 mb-3 text-orange-500 border-b border-orange-900/30 pb-2"><Flame size={16} /> <span className="text-xs font-black uppercase">Actividad</span></div>
+                        <span className="text-lg font-black text-orange-500">-{Math.round(totalBurned)}</span>
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
-                    <div className="space-y-3">
-                        {current.exercises?.map((ex, i) => (
-                            <div key={i} className="bg-gray-950 p-3 rounded-xl border border-gray-800">
-                                <div className="flex justify-between mb-2">
-                                    <span className="text-gray-200 font-bold text-sm">{ex.name}</span>
-                                    <span className="text-gray-500 text-xs font-mono">{ex.sets.length} Sets</span>
+// Detalle Misiones (Historial)
+function MissionsHistoryModal({ stats, onClose }) {
+    return (
+        <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+            <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative flex flex-col max-h-[80vh]">
+                <button onClick={onClose} className="absolute top-4 right-4 bg-gray-800/50 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
+                <div className="flex items-center gap-2 text-yellow-500 font-bold text-sm tracking-wider uppercase mb-1"><Trophy size={18} /> HISTORIAL</div>
+                <h2 className="text-2xl font-black text-white mb-4">Misiones</h2>
+                <div className="space-y-3 overflow-y-auto custom-scrollbar pr-1">
+                    {stats.listCompleted && stats.listCompleted.length > 0 ? (
+                        stats.listCompleted.map((m, idx) => (
+                            <div key={idx} className={`p-4 rounded-xl border flex flex-col gap-2 relative overflow-hidden group ${m.failed ? 'bg-red-950/30 border-red-500/30' : 'bg-gray-950 border-gray-800/50'}`}>
+                                <div className="flex justify-between items-start relative z-10">
+                                    <span className={`text-sm font-bold block line-clamp-2 ${m.failed ? 'text-red-200 line-through' : 'text-white'}`}>{m.title}</span>
+                                    {m.failed ? <span className="text-[9px] font-black bg-red-500 text-white px-1.5 py-0.5 rounded uppercase">FAIL</span> : <CheckCircle size={16} className="text-green-500" />}
                                 </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {ex.sets.map((s, j) => (
-                                        <div key={j} className="bg-gray-900 px-2 py-1 rounded text-xs text-gray-400 border border-gray-800">
-                                            <span className="text-white font-bold">{s.weight}kg</span> x {s.reps}
-                                        </div>
-                                    ))}
+                                <div className={`flex gap-3 mt-1 pt-2 border-t relative z-10 ${m.failed ? 'border-red-500/20' : 'border-gray-800'}`}>
+                                    {m.failed ? (
+                                        <div className="flex items-center gap-1 w-full justify-center"><HeartCrack size={12} className="text-red-500 fill-red-500" /><span className="text-xs font-bold text-red-400">{m.hpLoss ? `-${m.hpLoss} HP` : 'Sin castigo'}</span></div>
+                                    ) : (
+                                        <>
+                                            {(m.xpReward > 0) && <div className="flex items-center gap-1"><Star size={10} className="text-blue-400" /><span className="text-[10px] font-bold text-blue-200">+{m.xpReward} XP</span></div>}
+                                            {(m.coinReward > 0) && <div className="flex items-center gap-1"><Coins size={10} className="text-yellow-400" /><span className="text-[10px] font-bold text-yellow-200">+{m.coinReward}</span></div>}
+                                            {(m.gameCoinReward > 0) && <div className="flex items-center gap-1"><Gamepad2 size={10} className="text-purple-400" /><span className="text-[10px] font-bold text-purple-200">+{m.gameCoinReward}</span></div>}
+                                        </>
+                                    )}
                                 </div>
                             </div>
-                        ))}
-                    </div>
-
-                    <div className="mt-4 pt-4 border-t border-gray-800 text-center">
-                        <p className="text-xs text-gray-500 uppercase font-bold">Volumen Total</p>
-                        <p className="text-xl font-black text-white">
-                            {current.exercises?.reduce((t, e) => t + e.sets.reduce((s, st) => s + (st.weight * st.reps), 0), 0).toLocaleString()} <span className="text-sm font-normal text-gray-500">kg</span>
-                        </p>
-                    </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-6 bg-gray-950 rounded-xl border border-gray-800 text-gray-500 text-sm"><p>Sin actividad registrada.</p></div>
+                    )}
                 </div>
             </div>
         </div>
@@ -168,36 +194,65 @@ function GymDetailsModal({ workouts, onClose }) {
 }
 
 // ==========================================
-// COMPONENTE PRINCIPAL
+// COMPONENTE PRINCIPAL PERFIL
 // ==========================================
 
 export default function Profile() {
     const { user, setUser } = useOutletContext();
     const navigate = useNavigate();
 
-    // --- ESTADO FECHA ---
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [calendarViewDate, setCalendarViewDate] = useState(new Date());
-
     const [dailyData, setDailyData] = useState(null);
     const [loading, setLoading] = useState(false);
 
-    // --- ESTADOS PARA LOS MODALES DE WIDGETS MINI ---
+    // Modales de gráficas
     const [openMuscleMap, setOpenMuscleMap] = useState(false);
     const [openStrength, setOpenStrength] = useState(false);
-
-    // --- ESTADO ORDEN Y VISIBILIDAD ---
-    const [widgetOrder, setWidgetOrder] = useState([]);
-    const [visibleWidgets, setVisibleWidgets] = useState({});
 
     // Modales Detalle
     const [selectedSportList, setSelectedSportList] = useState(null);
     const [selectedTrainingList, setSelectedTrainingList] = useState(null);
-
     const [selectedFood, setSelectedFood] = useState(null);
     const [selectedMissions, setSelectedMissions] = useState(null);
+    const [showBalanceDetails, setShowBalanceDetails] = useState(false);
 
-    // --- LOGICA DE CERRAR SESIÓN ---
+    // --- CONFIGURACIÓN DE WIDGETS ---
+    const DEFAULTS_ORDER = [
+        'missions', 'sport', 'food', 'sleep', 'steps',
+        'mood', 'weight', 'training', 'streak', 'gains',
+        'weekly', 'kcalBalance'
+    ];
+
+    const DEFAULTS_CONFIG = {
+        missions: true, sport: true, food: true, sleep: true, steps: true,
+        mood: true, weight: true, training: true, streak: true, gains: true,
+        weekly: true, kcalBalance: true
+    };
+
+    const [widgetOrder, setWidgetOrder] = useState(DEFAULTS_ORDER);
+    const [visibleWidgets, setVisibleWidgets] = useState(DEFAULTS_CONFIG);
+
+    useEffect(() => {
+        try {
+            const savedOrder = JSON.parse(localStorage.getItem('home_widgets_order'));
+            if (savedOrder && Array.isArray(savedOrder)) {
+                // Sincronizar y asegurar que los nuevos widgets estén presentes
+                const mergedOrder = [...savedOrder];
+                if (!mergedOrder.includes('weekly')) mergedOrder.push('weekly');
+                if (!mergedOrder.includes('kcalBalance')) mergedOrder.push('kcalBalance');
+                setWidgetOrder(mergedOrder);
+            }
+
+            const savedConfig = JSON.parse(localStorage.getItem('home_widgets_config'));
+            if (savedConfig) {
+                setVisibleWidgets({ ...DEFAULTS_CONFIG, ...savedConfig });
+            }
+        } catch (e) {
+            console.error("Error cargando config widgets", e);
+        }
+    }, []);
+
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -205,25 +260,6 @@ export default function Profile() {
         navigate('/login');
     };
 
-    // 1. CARGAR CONFIGURACIÓN
-    useEffect(() => {
-        const savedOrder = localStorage.getItem('home_widgets_order');
-        const savedConfig = localStorage.getItem('home_widgets_config');
-
-        setWidgetOrder(savedOrder ? JSON.parse(savedOrder) : [
-            'missions', 'sport', 'food', 'sleep', 'steps',
-            'mood', 'weight', 'training', 'streak', 'gains',
-            'weekly' // <--- AÑADIDO POR DEFECTO
-        ]);
-
-        setVisibleWidgets(savedConfig ? JSON.parse(savedConfig) : {
-            missions: true, sport: true, food: true, sleep: true, steps: true,
-            mood: true, weight: true, training: true, streak: true, gains: true,
-            weekly: true // <--- ACTIVADO POR DEFECTO
-        });
-    }, []);
-
-    // 2. CARGAR DATOS HISTÓRICOS
     useEffect(() => {
         const fetchHistory = async () => {
             setLoading(true);
@@ -231,7 +267,7 @@ export default function Profile() {
                 const res = await api.get(`/daily/specific?date=${selectedDate}`);
                 setDailyData(res.data);
             } catch (error) {
-                console.error("Error cargando historial:", error);
+                console.error("Error historial:", error);
                 setDailyData(null);
             } finally {
                 setLoading(false);
@@ -240,7 +276,7 @@ export default function Profile() {
         fetchHistory();
     }, [selectedDate]);
 
-    // --- CALENDARIO VISUAL ---
+    // Helpers Calendario
     const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
     const getFirstDayOfMonth = (date) => {
         const day = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
@@ -293,72 +329,101 @@ export default function Profile() {
                 </div>
                 <div className="grid grid-cols-7 gap-1 text-center mb-2">{['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(d => (<span key={d} className="text-[10px] font-bold text-gray-600">{d}</span>))}</div>
                 <div className="grid grid-cols-7 gap-1 place-items-center">{days}</div>
-                <div className="mt-4 pt-3 border-t border-gray-800 text-center"><span className="text-xs text-blue-400 font-bold uppercase tracking-wider">Viendo datos del: {selectedDate}</span></div>
+                <div className="mt-4 pt-3 border-t border-gray-800 text-center"><span className="text-xs text-blue-400 font-bold uppercase tracking-wider">Histórico: {selectedDate}</span></div>
             </div>
         );
     };
 
-    const handleReadOnlyClick = () => { };
-
-    // --- RENDERIZADO WIDGETS ---
     const renderWidgetByKey = (key) => {
         if (loading) return null;
         if (!dailyData && !loading) return null;
 
+        const noOp = () => { };
+
         switch (key) {
             case 'missions':
-                const stats = dailyData.missionStats || { completed: 0, total: 0, listCompleted: [] };
                 return (
-                    <div onClick={() => setSelectedMissions(stats)} className="cursor-pointer h-full">
-                        <MissionsWidget completed={stats.completed} total={stats.total} />
+                    <div onClick={() => setSelectedMissions(dailyData.missionStats)} className="cursor-pointer h-full">
+                        <MissionsWidget completed={dailyData.missionStats?.completed || 0} total={dailyData.missionStats?.total || 0} />
                     </div>
                 );
 
             case 'sport':
-                if (!dailyData.sportWorkouts || dailyData.sportWorkouts.length === 0) return null;
-                return <div onClick={() => setSelectedSportList(dailyData.sportWorkouts)} className="cursor-pointer h-full"><SportWidget workouts={dailyData.sportWorkouts} /></div>;
+                const sports = dailyData.sportWorkouts || [];
+                return (
+                    <div
+                        onClick={() => sports.length > 0 && setSelectedSportList(sports)}
+                        className={`h-full ${sports.length > 0 ? 'cursor-pointer' : 'pointer-events-none opacity-80'}`}
+                    >
+                        <SportWidget workouts={sports} />
+                    </div>
+                );
 
             case 'training':
-                if (!dailyData.gymWorkouts || dailyData.gymWorkouts.length === 0) return null;
-                return <div onClick={() => setSelectedTrainingList(dailyData.gymWorkouts)} className="cursor-pointer h-full"><TrainingWidget workouts={dailyData.gymWorkouts} /></div>;
+                const gymWorkouts = dailyData.gymWorkouts || [];
+                return (
+                    <div
+                        onClick={() => gymWorkouts.length > 0 && setSelectedTrainingList(gymWorkouts)}
+                        className={`h-full ${gymWorkouts.length > 0 ? 'cursor-pointer' : 'pointer-events-none opacity-80'}`}
+                    >
+                        <TrainingWidget workouts={gymWorkouts} />
+                    </div>
+                );
 
             case 'food':
-                const currentKcal = dailyData.totalKcal || dailyData.nutrition?.totalKcal || 0;
-                const limitKcal = user?.macros?.calories || 2100;
-                return <div onClick={() => setSelectedFood(dailyData.nutrition)} className="cursor-pointer h-full"><FoodWidget currentKcal={currentKcal} limitKcal={limitKcal} /></div>;
+                const currentKcal = dailyData.nutrition?.totalKcal || dailyData.totalKcal || 0;
+                return <div onClick={() => setSelectedFood(dailyData.nutrition)} className="cursor-pointer h-full"><FoodWidget currentKcal={currentKcal} limitKcal={user?.macros?.calories || 2100} /></div>;
 
-            case 'sleep': return <div className="pointer-events-none opacity-90"><SleepWidget hours={dailyData.sleepHours} onUpdate={handleReadOnlyClick} /></div>;
-            case 'steps': return <div className="pointer-events-none opacity-90"><StepsWidget steps={dailyData.steps} onUpdate={handleReadOnlyClick} /></div>;
-            case 'mood': return <div className="pointer-events-none"><MoodWidget mood={dailyData.mood} onUpdate={handleReadOnlyClick} /></div>;
-            case 'weight': return <div className="pointer-events-none opacity-90 h-full flex flex-col"><WeightWidget initialWeight={dailyData.weight} onUpdate={handleReadOnlyClick} /></div>;
-            case 'streak': return <div className="pointer-events-none"><StreakWidget streak={dailyData.streakCurrent || 0} /></div>;
+            case 'sleep': return <div className="pointer-events-none opacity-90"><SleepWidget hours={dailyData.sleepHours} onUpdate={noOp} /></div>;
+            case 'steps': return <div className="pointer-events-none opacity-90"><StepsWidget steps={dailyData.steps} onUpdate={noOp} /></div>;
+            case 'mood': return <div className="pointer-events-none opacity-90"><MoodWidget mood={dailyData.mood} onUpdate={noOp} /></div>;
+            case 'weight':
+                return (
+                    <div className="h-full flex flex-col cursor-pointer">
+                        {/* AQUÍ ESTÁ EL CAMBIO: readOnly={true} */}
+                        <WeightWidget
+                            initialWeight={dailyData.weight}
+                            onUpdate={noOp}
+                            readOnly={true}
+                        />
+                    </div>
+                );
+            case 'streak': return <div className="pointer-events-none opacity-90"><StreakWidget streak={dailyData.streakCurrent || 0} /></div>;
 
-            // 🔥 WIDGET GAINS: AHORA MUESTRA TOTALES GLOBALES DEL USUARIO (IGUAL QUE HOME) 🔥
             case 'gains':
                 return (
-                    <div className="pointer-events-none h-full">
+                    <div className="pointer-events-none h-full opacity-90">
                         <GainsWidget
-                            totalCoins={user?.coins || 0}            // TOTAL GLOBAL
-                            gameCoins={user?.stats?.gameCoins || 0}  // TOTAL GLOBAL
-                            currentXP={user?.currentXP || 0}         // TOTAL GLOBAL
-                            level={user?.level}
-                            lives={user?.lives}
+                            totalCoins={user?.coins || 0}
+                            gameCoins={user?.stats?.gameCoins || 0}
+                            currentXP={user?.currentXP || 0}
                             nextLevelXP={user?.nextLevelXP || 100}
+                            level={user?.level || 1}
+                            lives={user?.lives || 0}
                         />
                     </div>
                 );
 
-            case 'weekly': return null; // Opcional: Ocultar o mostrar según prefieras
+            case 'weekly':
+                return <div className="h-full"><WeeklyWidget /></div>;
+
+            case 'kcalBalance':
+                const intake = dailyData.nutrition?.totalKcal || dailyData.totalKcal || 0;
+                const sportBurn = dailyData.sportWorkouts?.reduce((acc, curr) => acc + (curr.caloriesBurned || 0), 0) || 0;
+                const gymBurn = dailyData.gymWorkouts?.reduce((acc, curr) => acc + (curr.caloriesBurned || 0), 0) || 0;
+                const burned = sportBurn + gymBurn;
+                return <div onClick={() => setShowBalanceDetails(true)} className="h-full cursor-pointer"><KcalBalanceWidget intake={intake} burned={burned} /></div>;
 
             default: return null;
         }
     };
 
-    if (loading || !user) return <div className="min-h-screen flex flex-col items-center justify-center space-y-4 text-gray-500 animate-pulse"><Activity size={48} className="text-blue-500 animate-spin" /><p>Cargando...</p></div>;
+    if (loading || !user) return <div className="min-h-screen flex flex-col items-center justify-center space-y-4 text-gray-500 animate-pulse"><Activity size={48} className="text-blue-500 animate-spin" /><p>Cargando Perfil...</p></div>;
 
     return (
-        <div className="pb-24 pt-4 px-4 min-h-screen animate-in fade-in">
-            {/* HEADER */}
+        <div className="pb-24 pt-4 px-4 min-h-screen animate-in fade-in select-none">
+
+            {/* HEADER PERFIL */}
             <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-3xl p-6 mb-6 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-10 opacity-10 bg-blue-500 blur-3xl rounded-full w-40 h-40 -mr-10 -mt-10"></div>
                 <div className="flex items-center gap-4 relative z-10">
@@ -384,34 +449,31 @@ export default function Profile() {
                 </div>
             </div>
 
-            {/* AVATAR RPG + GRÁFICAS (AHORA EN GRID) */}
+            {/* GRÁFICAS */}
             <div className="grid grid-cols-2 gap-4 mb-8">
-                {/* 1. Widget Mapa Muscular */}
                 <RPGBody mini={true} onClick={() => setOpenMuscleMap(true)} />
-
-                {/* 2. Widget Fuerza */}
                 <ProfileStats mini={true} onClick={() => setOpenStrength(true)} />
             </div>
 
             {/* CALENDARIO */}
             {renderCalendar()}
 
-            {/* WIDGETS DEL DÍA SELECCIONADO */}
+            {/* WIDGETS HISTÓRICOS */}
             {loading ? (
                 <div className="text-center py-20 text-gray-500 animate-pulse flex flex-col items-center">
                     <Activity size={32} className="mb-2" />
-                    <p>Viajando al {selectedDate}...</p>
+                    <p>Consultando el pasado...</p>
                 </div>
             ) : !dailyData ? (
                 <div className="bg-gray-900/30 border border-gray-800 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center text-gray-500 gap-4">
                     <CalendarIcon size={48} className="opacity-20" />
-                    <p>No hay registros en este día.</p>
+                    <p>No hay registros este día.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-2 gap-4 auto-rows-fr">
                     {widgetOrder.map((key) => {
-                        if (!visibleWidgets[key]) return null;
-                        const isFullWidth = key === 'training' || key === 'missions' || key === 'weekly';
+                        // 🔥 LÓGICA DE TAMAÑO EXACTA A HOME (Semanal es 50% = col-span-1)
+                        const isFullWidth = key === 'training' || key === 'missions';
                         const widgetContent = renderWidgetByKey(key);
                         if (!widgetContent) return null;
                         return <div key={key} className={isFullWidth ? 'col-span-2' : 'col-span-1'}>{widgetContent}</div>;
@@ -419,7 +481,7 @@ export default function Profile() {
                 </div>
             )}
 
-            {/* --- SECCIÓN DE AJUSTES Y LOGOUT --- */}
+            {/* LOGOUT */}
             <div className="mt-10 border-t border-gray-800 pt-6 px-2">
                 <h3 className="text-gray-500 font-bold text-xs uppercase ml-1 mb-3">Configuración de Cuenta</h3>
                 <button
@@ -437,8 +499,9 @@ export default function Profile() {
             </div>
 
             {/* --- ZONA DE DEBUG --- */}
-            <div className="mt-8 mb-4 border-t border-gray-800 pt-4">
-                <p className="text-[10px] text-gray-600 text-center mb-2 uppercase font-bold">Zona de Pruebas</p>
+            <div className="mt-8 mb-4 border-t border-gray-800 pt-4 grid grid-cols-2 gap-2">
+                <p className="text-[10px] text-gray-600 text-center col-span-2 mb-2 uppercase font-bold">Zona de Pruebas (Admin)</p>
+
                 <button
                     onClick={async () => {
                         if (!window.confirm("¿Generar un entreno falso hace 8 días?")) return;
@@ -451,13 +514,43 @@ export default function Profile() {
                     }}
                     className="w-full py-2 bg-purple-900/20 border border-purple-500/30 text-purple-400 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-purple-900/40 transition-colors"
                 >
-                    <Zap size={14} /> INYECTAR DATOS PASADOS
+                    <Zap size={14} /> DATOS PASADOS
+                </button>
+
+                <button
+                    onClick={async () => {
+                        if (!window.confirm("⚠️ ¿Simular que ha pasado una noche?\n\nEsto revisará misiones NO completadas y te quitará vida si fallaste alguna ayer.")) return;
+                        try {
+                            const res = await api.post('/users/debug/force-night');
+                            alert(`Resultado: ${res.data.message}\nTu vida ahora: ${res.data.user.hp}`);
+                            setUser(res.data.user);
+                            localStorage.setItem('user', JSON.stringify(res.data.user));
+                        } catch (e) {
+                            alert("Error: " + e.message);
+                        }
+                    }}
+                    className="w-full py-2 bg-red-900/20 border border-red-500/30 text-red-400 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-red-900/40 transition-colors"
+                >
+                    <Moon size={14} /> SIMULAR NOCHE
+                </button>
+
+                <button
+                    onClick={async () => {
+                        try {
+                            await api.post('/users/debug/yesterday');
+                            alert("✅ El sistema ahora cree que tu última conexión fue AYER. Recarga la página y verás subir la racha.");
+                            window.location.reload();
+                        } catch (e) {
+                            alert("Error: " + e.message);
+                        }
+                    }}
+                    className="col-span-2 w-full py-2 bg-yellow-900/20 border border-yellow-500/30 text-yellow-400 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-yellow-900/40 transition-colors"
+                >
+                    <Flame size={14} /> SIMULAR VISITA AYER (SUBIR RACHA)
                 </button>
             </div>
 
-            {/* --- MODALES DETALLE (SOLO LECTURA) --- */}
-
-            {/* MODAL MAPA MUSCULAR COMPLETO */}
+            {/* --- MODALES --- */}
             {openMuscleMap && (
                 <div className="fixed inset-0 z-[80] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
                     <div className="w-full max-w-4xl h-[90vh] overflow-y-auto relative bg-gray-900 rounded-3xl border border-gray-800 shadow-2xl p-2 sm:p-6 flex flex-col">
@@ -467,7 +560,6 @@ export default function Profile() {
                 </div>
             )}
 
-            {/* MODAL FUERZA COMPLETO */}
             {openStrength && (
                 <div className="fixed inset-0 z-[80] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
                     <div className="w-full max-w-2xl bg-gray-900 rounded-3xl border border-gray-800 shadow-2xl p-2 sm:p-6 relative">
@@ -477,85 +569,13 @@ export default function Profile() {
                 </div>
             )}
 
-            {/* MODAL HISTORIAL DE MISIONES */}
-            // ... imports (Asegúrate de importar HeartCrack o Heart si los usas)
-            // Reemplazar la parte del modal de misiones con esto:
+            {/* Modales de Historial */}
+            {selectedSportList && <SportDetailsModal workouts={selectedSportList} onClose={() => setSelectedSportList(null)} />}
+            {selectedTrainingList && <GymDetailsModal workouts={selectedTrainingList} onClose={() => setSelectedTrainingList(null)} />}
+            {showBalanceDetails && dailyData && <BalanceDetailsModal data={dailyData} onClose={() => setShowBalanceDetails(false)} />}
+            {selectedMissions && <MissionsHistoryModal stats={selectedMissions} onClose={() => setSelectedMissions(null)} />}
 
-            {/* MODAL HISTORIAL DE MISIONES */}
-            {selectedMissions && (
-                <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative flex flex-col max-h-[80vh]">
-                        <button onClick={() => setSelectedMissions(null)} className="absolute top-4 right-4 bg-gray-800/50 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
-                        <div className="flex items-center gap-2 text-yellow-500 font-bold text-sm tracking-wider uppercase mb-1"><Trophy size={18} /> HISTORIAL</div>
-                        <h2 className="text-2xl font-black text-white mb-4">Misiones</h2>
-
-                        <div className="space-y-3 overflow-y-auto custom-scrollbar pr-1">
-                            {selectedMissions.listCompleted && selectedMissions.listCompleted.length > 0 ? (
-                                selectedMissions.listCompleted.map((m, idx) => (
-                                    <div key={idx} className={`p-4 rounded-xl border flex flex-col gap-2 relative overflow-hidden group ${m.failed
-                                            ? 'bg-red-950/30 border-red-500/30' // Estilo Fallida
-                                            : 'bg-gray-950 border-gray-800/50' // Estilo Completada
-                                        }`}>
-
-                                        {/* Cabecera */}
-                                        <div className="flex justify-between items-start relative z-10">
-                                            <span className={`text-sm font-bold block line-clamp-2 ${m.failed ? 'text-red-200 line-through' : 'text-white'}`}>
-                                                {m.title}
-                                            </span>
-                                            {m.failed ? (
-                                                <span className="text-[9px] font-black bg-red-500 text-white px-1.5 py-0.5 rounded uppercase">FAIL</span>
-                                            ) : (
-                                                <CheckCircle size={16} className="text-green-500" />
-                                            )}
-                                        </div>
-
-                                        {/* Etiquetas */}
-                                        <div className="flex gap-2 relative z-10 flex-wrap">
-                                            <span className="text-[9px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded border border-gray-700 uppercase font-bold">
-                                                {m.frequency === 'daily' ? 'Diaria' : m.frequency || 'Misión'}
-                                            </span>
-                                            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border text-gray-400 border-gray-700">
-                                                {m.difficulty || 'Normal'}
-                                            </span>
-                                        </div>
-
-                                        {/* Footer: Recompensas o Castigo */}
-                                        <div className={`flex gap-3 mt-1 pt-2 border-t relative z-10 ${m.failed ? 'border-red-500/20' : 'border-gray-800'}`}>
-
-                                            {m.failed ? (
-                                                /* MODO FALLIDA: Muestra Vida Perdida */
-                                                <div className="flex items-center gap-1 w-full justify-center">
-                                                    <HeartCrack size={12} className="text-red-500 fill-red-500" />
-                                                    <span className="text-xs font-bold text-red-400">
-                                                        {m.hpLoss ? `-${m.hpLoss} HP` : 'Sin castigo'}
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                /* MODO COMPLETADA: Muestra Premios */
-                                                <>
-                                                    {(m.xpReward > 0) && (
-                                                        <div className="flex items-center gap-1"><Star size={10} className="text-blue-400" /><span className="text-[10px] font-bold text-blue-200">+{m.xpReward} XP</span></div>
-                                                    )}
-                                                    {(m.coinReward > 0) && (
-                                                        <div className="flex items-center gap-1"><Coins size={10} className="text-yellow-400" /><span className="text-[10px] font-bold text-yellow-200">+{m.coinReward}</span></div>
-                                                    )}
-                                                    {(m.gameCoinReward > 0) && (
-                                                        <div className="flex items-center gap-1"><Gamepad2 size={10} className="text-purple-400" /><span className="text-[10px] font-bold text-purple-200">+{m.gameCoinReward}</span></div>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-6 bg-gray-950 rounded-xl border border-gray-800 text-gray-500 text-sm">
-                                    <p>No hay registro de misiones.</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Modal Comida Detalle */}
             {selectedFood && (
                 <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative flex flex-col">
@@ -573,7 +593,7 @@ export default function Profile() {
                                 const kcal = selectedFood[meal.key] || 0;
                                 const percent = selectedFood.totalKcal > 0 ? (kcal / selectedFood.totalKcal) * 100 : 0;
                                 return (
-                                    <div key={meal.key} className="bg-gray-950 p-3 rounded-xl border border-gray-800 flex items-center justify-between group hover:border-blue-500/30 transition-colors">
+                                    <div key={meal.key} className="bg-gray-950 p-3 rounded-xl border border-gray-800 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <div className="bg-gray-900 p-2 rounded-lg">{meal.icon}</div>
                                             <div className="flex flex-col">
@@ -591,10 +611,6 @@ export default function Profile() {
                     </div>
                 </div>
             )}
-
-            {/* NUEVOS MODALES CON PESTAÑAS (PARA HISTORIAL) */}
-            {selectedSportList && <SportDetailsModal workouts={selectedSportList} onClose={() => setSelectedSportList(null)} />}
-            {selectedTrainingList && <GymDetailsModal workouts={selectedTrainingList} onClose={() => setSelectedTrainingList(null)} />}
 
         </div>
     );

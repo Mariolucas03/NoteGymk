@@ -1,95 +1,65 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
 const protect = require('../middleware/authMiddleware');
 
-// Importamos las funciones que creamos en el controlador
+// Importamos TODAS las funciones del controlador (incluidas las de Game Over y Debug)
 const {
     getMe,
     updateMacros,
     claimDailyReward,
-    addGameReward
+    addGameReward,
+    updatePhysicalStats,
+    simulateYesterday,
+    setManualStreak,
+    forceNightlyMaintenance,
+    setRedemptionMission,
+    reviveUser,
+    updateStatsManual
 } = require('../controllers/userController');
 
 // ==========================================
-// 🟢 RUTAS NUEVAS (SOLUCIÓN AL 404)
+// 🟢 RUTAS DE PERFIL Y DATOS
 // ==========================================
 
-// 1. Obtener perfil
+// 1. Obtener perfil del usuario
 router.get('/', protect, getMe);
 
-// 2. Actualizar Macros (ESTA ES LA QUE FALLABA)
+// 2. Actualizar Macros
 router.put('/macros', protect, updateMacros);
 
-// 3. Recompensas
+// 3. Recompensas (Diaria y Genérica)
 router.post('/claim-daily', protect, claimDailyReward);
 router.post('/reward', protect, addGameReward);
 
+// 4. Actualizar datos físicos (Edad, Altura, Género)
+router.put('/physical-stats', protect, updatePhysicalStats);
+
 
 // ==========================================
-// 🔴 LÓGICA DE JUEGO (Muerte y Redención)
+// 🟡 ZONA DE DEBUG (PRUEBAS)
 // ==========================================
-// Mantenemos esto aquí inline para no romper tu sistema de "Game Over"
 
-// Establecer misión de rescate
-router.post('/set-redemption-mission', protect, async (req, res) => {
-    try {
-        const { mission } = req.body;
-        if (!mission || mission.trim() === '') {
-            return res.status(400).json({ message: "La misión es obligatoria" });
-        }
+// Simular que la última visita fue ayer (para probar rachas)
+router.post('/debug/yesterday', protect, simulateYesterday);
 
-        const user = await User.findById(req.user.id);
-        if (user.redemptionMission) {
-            return res.status(400).json({ message: "Pacto ya sellado." });
-        }
+// Forzar una racha específica
+router.put('/debug/streak', protect, setManualStreak);
 
-        user.redemptionMission = mission;
-        await user.save();
-        res.json({ message: "Pacto sellado", user });
-    } catch (error) {
-        res.status(500).json({ message: "Error servidor" });
-    }
-});
+// Forzar el mantenimiento nocturno (para probar castigos de vida)
+router.post('/debug/force-night', protect, forceNightlyMaintenance);
 
-// Revivir (Resetear vida)
-router.post('/revive', protect, async (req, res) => {
-    try {
-        const user = await User.findById(req.user.id);
 
-        // Solo permite revivir si está muerto (o cerca) para evitar trampas, 
-        // aunque para testing permitimos si hp <= 0.
-        user.stats.hp = 20; // Revive con poca vida
-        user.lives = 20;    // Compatibilidad
+// ==========================================
+// 🔴 LÓGICA DE JUEGO (GAME OVER / REDENCIÓN)
+// ==========================================
 
-        await user.save();
-        res.json({ message: "Has revivido.", user });
-    } catch (err) {
-        res.status(500).send('Server Error');
-    }
-});
+// Establecer la misión para salir del Game Over
+router.post('/set-redemption-mission', protect, setRedemptionMission);
 
-// Actualizar stats manualmente (Debug/Testing)
-router.put('/update-stats', protect, async (req, res) => {
-    const { hp, xp, coins } = req.body;
-    try {
-        const user = await User.findById(req.user.id);
+// Revivir (Resetear vida a 20)
+router.post('/revive', protect, reviveUser);
 
-        if (hp !== undefined) {
-            user.stats.hp = hp;
-            user.lives = hp; // Mantener sincro
-        }
-        if (xp !== undefined) user.stats.currentXP = xp;
-        if (coins !== undefined) {
-            user.stats.coins = coins;
-            user.coins = coins; // Mantener sincro
-        }
-
-        await user.save();
-        res.json(user);
-    } catch (err) {
-        res.status(500).send('Server Error');
-    }
-});
+// Actualizar stats manualmente (Vida, XP, Monedas) - Útil para testing
+router.put('/update-stats', protect, updateStatsManual);
 
 module.exports = router;

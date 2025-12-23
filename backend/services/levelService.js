@@ -2,89 +2,61 @@ const User = require('../models/User');
 
 const calculateNextLevelXP = (level) => level * 100;
 
-// --- FUNCIÓN NUEVA: AUTO-REPARACIÓN DE NIVEL ---
+// Auto-reparación
 const ensureLevelConsistency = async (userId) => {
     const user = await User.findById(userId);
     if (!user) return null;
 
     let changed = false;
-
-    // Asegurar que nextLevelXP tenga valor lógico
     if (!user.nextLevelXP || user.nextLevelXP === 0) {
         user.nextLevelXP = calculateNextLevelXP(user.level || 1);
         changed = true;
     }
 
-    // Bucle de reparación: Mientras tengas más XP de la necesaria, subes de nivel
+    // Lógica de subir nivel
     while (user.currentXP >= user.nextLevelXP) {
-        console.log(`🔧 REPARANDO NIVEL: ${user.level} -> ${user.level + 1}`);
+        console.log(`🔧 NIVEL UP (Fix): ${user.level} -> ${user.level + 1}`);
         user.currentXP -= user.nextLevelXP;
         user.level = (user.level || 1) + 1;
         user.nextLevelXP = calculateNextLevelXP(user.level);
-
-        // Restaurar vida al subir nivel
-        user.stats.hp = 100;
-        user.lives = 100;
-
+        user.hp = user.maxHp; // Restaurar vida completa (usando campo raíz)
         changed = true;
     }
 
-    if (changed) {
-        // Sincronizar el objeto stats con el root
-        if (!user.stats) user.stats = {};
-        user.stats.level = user.level;
-        user.stats.currentXP = user.currentXP;
-        user.stats.nextLevelXP = user.nextLevelXP;
-        user.stats.coins = user.coins;
-        // user.stats.gameCoins se mantiene igual
-
-        await user.save();
-    }
-
+    if (changed) await user.save();
     return user;
 };
 
-// --- FUNCIÓN EXISTENTE (MANTENER) ---
 const addRewards = async (userId, xpReward, coinReward, gameCoinReward = 0) => {
     const user = await User.findById(userId);
     if (!user) throw new Error("Usuario no encontrado");
 
-    const xpAdd = parseInt(xpReward) || 0;
-    const coinsAdd = parseInt(coinReward) || 0;
-    const gameCoinsAdd = parseInt(gameCoinReward) || 0;
-
-    user.currentXP = (user.currentXP || 0) + xpAdd;
-    user.coins = (user.coins || 0) + coinsAdd;
-
-    if (!user.stats) user.stats = {};
-    user.stats.gameCoins = (user.stats.gameCoins || 0) + gameCoinsAdd;
+    // Sumar directamente a la raíz
+    user.currentXP += parseInt(xpReward) || 0;
+    user.coins += parseInt(coinReward) || 0;
+    user.gameCoins += parseInt(gameCoinReward) || 0;
 
     let leveledUp = false;
-    if (!user.nextLevelXP) user.nextLevelXP = 100;
+    if (!user.nextLevelXP) user.nextLevelXP = calculateNextLevelXP(user.level);
 
+    // Check Level Up
     while (user.currentXP >= user.nextLevelXP) {
         console.log(`¡LEVEL UP! ${user.level} -> ${user.level + 1}`);
         user.currentXP -= user.nextLevelXP;
-        user.level = (user.level || 1) + 1;
+        user.level += 1;
         user.nextLevelXP = calculateNextLevelXP(user.level);
 
-        user.stats.hp = 100;
-        user.lives = 100;
+        user.hp = user.maxHp; // Restaurar vida
+        // user.lives = user.hp; // Si decides eliminar 'lives' y usar solo 'hp', borra esto
         leveledUp = true;
     }
-
-    // Sincronización Final
-    user.stats.level = user.level;
-    user.stats.currentXP = user.currentXP;
-    user.stats.nextLevelXP = user.nextLevelXP;
-    user.stats.coins = user.coins;
 
     const savedUser = await user.save();
 
     return {
         user: savedUser,
         leveledUp,
-        rewards: { xp: xpAdd, coins: coinsAdd, gameCoins: gameCoinsAdd }
+        rewards: { xp: xpReward, coins: coinReward, gameCoins: gameCoinReward }
     };
 };
 

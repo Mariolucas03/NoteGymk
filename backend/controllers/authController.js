@@ -28,32 +28,26 @@ const registerUser = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Creamos usuario con valores iniciales explícitos (opcional, el modelo tiene defaults)
+        // Creamos usuario con valores en la RAÍZ (Nueva estructura)
         const user = await User.create({
             username,
             email,
             password: hashedPassword,
             coins: 0,
+            gameCoins: 500, // Bono de bienvenida para juegos
             level: 1,
-            lives: 100,
+            hp: 100,       // Salud en raíz
+            lives: 100,    // Compatibilidad
             streak: { current: 1, lastLogDate: new Date() }
         });
 
         if (user) {
+            // Convertimos a objeto para que Mongoose active los Virtuals (stats)
+            const userResponse = user.toObject();
+
             res.status(201).json({
-                _id: user.id,
-                username: user.username,
-                email: user.email,
-                token: generateToken(user._id),
-                // Datos RPG iniciales
-                level: user.level,
-                currentXP: user.currentXP,
-                nextLevelXP: user.nextLevelXP,
-                coins: user.coins,
-                lives: user.lives,
-                streak: user.streak,
-                macros: user.macros, // Importante para el widget de comida
-                dailyRewards: user.dailyRewards
+                ...userResponse, // Envía todo: _id, username, coins, level, y el virtual 'stats'
+                token: generateToken(user._id)
             });
         } else {
             res.status(400).json({ message: 'Datos inválidos' });
@@ -72,21 +66,13 @@ const loginUser = async (req, res) => {
         const user = await User.findOne({ email });
 
         if (user && (await bcrypt.compare(password, user.password))) {
+            // Convertimos a objeto para asegurar que el Frontend recibe 
+            // tanto los datos planos (root) como el virtual 'stats'
+            const userResponse = user.toObject();
+
             res.json({
-                _id: user.id,
-                username: user.username,
-                email: user.email,
-                token: generateToken(user._id),
-                // Devolvemos TODO el perfil para que el frontend se hidrate
-                level: user.level,
-                currentXP: user.currentXP,
-                nextLevelXP: user.nextLevelXP,
-                coins: user.coins,
-                lives: user.lives,
-                streak: user.streak,
-                macros: user.macros,
-                dailyRewards: user.dailyRewards,
-                createdAt: user.createdAt
+                ...userResponse,
+                token: generateToken(user._id)
             });
         } else {
             res.status(401).json({ message: 'Credenciales inválidas' });

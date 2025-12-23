@@ -1,13 +1,12 @@
 import React from 'react';
-import { Dumbbell, CheckCircle, ChevronRight, Clock, Layers } from 'lucide-react';
+import { Dumbbell, CheckCircle, ChevronRight, Clock, Layers, Flame } from 'lucide-react'; // Añadido Flame
 
 export default function TrainingWidget({ workouts = [] }) {
-    // Aseguramos que sea array
     const safeWorkouts = Array.isArray(workouts) ? workouts : [];
     const count = safeWorkouts.length;
     const lastWorkout = count > 0 ? safeWorkouts[count - 1] : null;
 
-    // --- ESTADO 1: NO HAY ENTRENAMIENTO (PENDIENTE) ---
+    // --- ESTADO 1: PENDIENTE ---
     if (count === 0) {
         return (
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 h-40 relative overflow-hidden flex flex-col justify-between shadow-lg cursor-pointer hover:border-blue-500/50 transition-all group">
@@ -31,9 +30,9 @@ export default function TrainingWidget({ workouts = [] }) {
         );
     }
 
-    // --- ESTADO 2: ENTRENAMIENTOS COMPLETADOS ---
+    // --- ESTADO 2: COMPLETADO ---
     return (
-        <div className="bg-gradient-to-br from-green-900/40 to-gray-900 border border-green-500/30 rounded-2xl p-4 h-40 relative overflow-hidden flex flex-col justify-between shadow-lg cursor-pointer hover:border-green-500/60 transition-all group">
+        <div className="bg-gradient-to-br from-indigo-900/40 to-gray-900 border border-indigo-500/30 rounded-2xl p-4 h-40 relative overflow-hidden flex flex-col justify-between shadow-lg cursor-pointer hover:border-indigo-500/60 transition-all group">
 
             <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                 <CheckCircle size={48} />
@@ -41,13 +40,13 @@ export default function TrainingWidget({ workouts = [] }) {
 
             <div className="z-10 flex justify-between items-start">
                 <div className="flex items-center gap-2 mb-1">
-                    <div className="bg-green-500/20 p-1 rounded-md">
-                        <CheckCircle size={14} className="text-green-400" />
+                    <div className="bg-indigo-500/20 p-1 rounded-md">
+                        <CheckCircle size={14} className="text-indigo-400" />
                     </div>
-                    <span className="text-green-400 text-xs font-bold uppercase tracking-wider">Gym</span>
+                    <span className="text-indigo-400 text-xs font-bold uppercase tracking-wider">Gym</span>
                 </div>
                 {count > 1 && (
-                    <span className="bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
+                    <span className="bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
                         <Layers size={10} /> x{count}
                     </span>
                 )}
@@ -57,17 +56,25 @@ export default function TrainingWidget({ workouts = [] }) {
                 <h3 className="text-xl font-bold text-white leading-tight line-clamp-2">
                     {lastWorkout.name}
                 </h3>
-                <p className="text-gray-400 text-xs flex items-center gap-3 mt-1 font-medium">
-                    <span className="flex items-center gap-1">
+                <div className="flex items-center gap-3 mt-1">
+                    {/* Tiempo */}
+                    <span className="flex items-center gap-1 text-gray-400 text-xs font-medium">
                         <Clock size={12} /> {Math.floor((lastWorkout.duration || 0) / 60)} min
                     </span>
-                </p>
+
+                    {/* Calorías (SI EXISTEN) */}
+                    {lastWorkout.caloriesBurned > 0 && (
+                        <span className="flex items-center gap-1 text-orange-400 text-xs font-bold">
+                            <Flame size={12} /> {lastWorkout.caloriesBurned} kcal
+                        </span>
+                    )}
+                </div>
             </div>
 
             <div className="z-10 flex justify-between items-center text-[10px] text-gray-500">
                 <span>{count > 1 ? 'Ver todos' : 'Ver detalle'}</span>
                 <div className="bg-black/30 p-2 rounded-full group-hover:bg-black/50 transition-colors">
-                    <ChevronRight size={16} className="text-green-400" />
+                    <ChevronRight size={16} className="text-indigo-400" />
                 </div>
             </div>
         </div>

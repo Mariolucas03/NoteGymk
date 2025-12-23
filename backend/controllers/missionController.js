@@ -17,13 +17,17 @@ const getMissions = asyncHandler(async (req, res) => {
 
 // --- CREAR MISIÓN ---
 const createMission = asyncHandler(async (req, res) => {
-    const { title, frequency, type, difficulty, target } = req.body;
+    // 1. Recibimos 'specificDays' del frontend
+    const { title, frequency, type, difficulty, target, specificDays } = req.body;
 
     if (!title) { res.status(400); throw new Error('Título obligatorio'); }
 
     const freq = frequency || 'daily';
     const diff = difficulty || 'easy';
     const missionType = type || 'habit';
+
+    // 2. Validar días específicos (solo si es array)
+    const days = Array.isArray(specificDays) ? specificDays : [];
 
     const mult = (DIFFICULTY_MULTIPLIERS[diff] || 1) * (FREQUENCY_MULTIPLIERS[freq] || 1);
     const finalXP = BASE_XP * mult;
@@ -34,6 +38,7 @@ const createMission = asyncHandler(async (req, res) => {
         user: req.user._id,
         title: title.trim(),
         frequency: freq,
+        specificDays: days, // 🔥 GUARDAMOS LOS DÍAS
         type: missionType,
         difficulty: diff,
         target: Number(target) || 1,
@@ -93,8 +98,6 @@ const completeMission = asyncHandler(async (req, res) => {
     // 5. 🔥 GUARDAR SNAPSHOT EN HISTORIAL (DailyLog) 🔥
     const todayStr = today.toISOString().split('T')[0];
 
-    // Solo sumamos al contador visual (ej: 2/5) si es DIARIA.
-    // Las semanales/mensuales se guardan en la lista pero no afectan al contador diario.
     const isDaily = mission.frequency === 'daily';
     const incrementValue = isDaily ? 1 : 0;
 
@@ -108,14 +111,13 @@ const completeMission = asyncHandler(async (req, res) => {
             },
             $push: {
                 'missionStats.listCompleted': {
-                    // Guardamos TODOS los datos fijos de la misión
                     title: mission.title,
                     coinReward: mission.coinReward,
                     xpReward: mission.xpReward,
                     gameCoinReward: mission.gameCoinReward || 0,
                     frequency: mission.frequency,
                     difficulty: mission.difficulty,
-                    type: mission.type // <--- AÑADIDO: Guardamos si era Hábito o Temporal
+                    type: mission.type
                 }
             }
         },

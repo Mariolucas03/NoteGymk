@@ -31,7 +31,9 @@ const buyItem = async (req, res) => {
         const item = await ShopItem.findById(itemId);
 
         if (!item) return res.status(404).json({ message: 'No existe' });
-        if (user.coins < item.price) return res.status(400).json({ message: 'Sin saldo' });
+
+        // CORRECCIÓN: Usar user.coins directo
+        if ((user.coins || 0) < item.price) return res.status(400).json({ message: 'Sin saldo' });
 
         user.coins -= item.price;
 
@@ -48,49 +50,73 @@ const buyItem = async (req, res) => {
 const useItem = async (req, res) => {
     try {
         const { itemId } = req.body;
+        // Populate para acceder a los datos del item dentro del inventario
         const user = await User.findById(req.user._id).populate('inventory.item');
 
         const index = user.inventory.findIndex(i => i.item && i.item._id.toString() === itemId);
-        if (index === -1) return res.status(400).json({ message: 'No tienes el objeto' });
+        if (index === -1) return res.status(400).json({ message: 'No tienes este objeto' });
 
         const entry = user.inventory[index];
         const item = entry.item;
         let msg = `Usado: ${item.name}`;
 
+        // --- LÓGICA POR CATEGORÍA ---
+
+        // 1. PREMIOS PERSONALIZADOS (Solo se consumen y dan un mensaje bonito)
+        if (item.category === 'reward') {
+            msg = `¡Disfruta tu recompensa: "${item.name}"! 🎉`;
+        }
+
+        // 2. CONSUMIBLES (Lógica existente)
         if (item.category === 'consumable') {
             if (item.effectType === 'heal') {
-                user.stats.hp = Math.min(user.stats.maxHp, (user.stats.hp || 0) + item.effectValue);
+                const currentHp = user.hp || 0;
+                const maxHp = user.maxHp || 100;
+                user.hp = Math.min(maxHp, currentHp + item.effectValue);
+                user.lives = user.hp; // Sincro
                 msg = `¡Recuperaste ${item.effectValue} HP!`;
             }
             if (item.effectType === 'xp') {
-                user.currentXP += item.effectValue;
+                user.currentXP = (user.currentXP || 0) + item.effectValue;
                 msg = `¡Ganaste ${item.effectValue} XP!`;
             }
         }
 
+        // 3. COFRES (Lógica existente)
         if (item.category === 'chest') {
             const roll = Math.random();
             if (roll < 0.6) {
                 const coins = Math.floor(Math.random() * 100) + 50;
-                user.coins += coins;
+                user.coins = (user.coins || 0) + coins;
                 msg = `¡El cofre tenía ${coins} Monedas!`;
             } else {
                 const xp = Math.floor(Math.random() * 300) + 100;
-                user.currentXP += xp;
+                user.currentXP = (user.currentXP || 0) + xp;
                 msg = `¡El cofre tenía ${xp} XP!`;
             }
         }
 
-        if (entry.quantity > 1) entry.quantity--;
-        else user.inventory.splice(index, 1);
+        // --- CONSUMIR EL OBJETO ---
+        // Reducimos cantidad o eliminamos del array
+        if (entry.quantity > 1) {
+            entry.quantity--;
+        } else {
+            user.inventory.splice(index, 1);
+        }
 
         await user.save();
+
+        // Devolvemos usuario actualizado con populate para refrescar el inventario en frontend
         const updatedUser = await User.findById(user._id).populate('inventory.item');
+
         res.json({ message: msg, user: updatedUser });
-    } catch (error) { res.status(500).json({ message: 'Error usando objeto' }); }
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error usando objeto' });
+    }
 };
 
-// 🔥 NUEVO: INTERCAMBIO FICHAS -> MONEDAS
 const exchangeCurrency = async (req, res) => {
     try {
         const { amountGameCoins } = req.body;
@@ -101,7 +127,8 @@ const exchangeCurrency = async (req, res) => {
 
         const user = await User.findById(req.user._id);
 
-        if ((user.stats.gameCoins || 0) < amountGameCoins) {
+        // CORRECCIÓN: Usar user.gameCoins directo
+        if ((user.gameCoins || 0) < amountGameCoins) {
             return res.status(400).json({ message: 'No tienes suficientes fichas' });
         }
 
@@ -112,11 +139,8 @@ const exchangeCurrency = async (req, res) => {
             return res.status(400).json({ message: 'Mínimo 10 fichas para cambiar.' });
         }
 
-        user.stats.gameCoins -= amountGameCoins;
-        user.coins += coinsToReceive;
-
-        // Sincronizar stats.coins si existe duplicidad en tu modelo
-        if (user.stats.coins !== undefined) user.stats.coins = user.coins;
+        user.gameCoins -= amountGameCoins;
+        user.coins = (user.coins || 0) + coinsToReceive;
 
         await user.save();
 
@@ -131,12 +155,18 @@ const exchangeCurrency = async (req, res) => {
     }
 };
 
+// @desc    RESETEAR TIENDA (Modo Limpieza)
 const seedShop = async (req, res) => {
     try {
+        // 1. Borramos TODOS los objetos que no sean recompensas personalizadas del usuario
+        // (Mantenemos las recompensas que tú hayas creado manualmente, si las hay)
         await ShopItem.deleteMany({ category: { $ne: 'reward' } });
-        // (Tu catálogo aquí, omitido para brevedad, no cambia)
-        res.json({ message: 'Tienda actualizada.' });
-    } catch (error) { res.status(500).json({ message: 'Error en seed' }); }
+
+        res.json({ message: '🧹 Tienda vaciada correctamente. Lista para construir.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error limpiando tienda' });
+    }
 };
 
 module.exports = { getShopItems, createCustomReward, buyItem, useItem, seedShop, exchangeCurrency };

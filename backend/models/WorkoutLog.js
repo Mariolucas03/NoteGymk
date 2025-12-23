@@ -18,15 +18,14 @@ const workoutLogSchema = mongoose.Schema({
         type: Number,
         required: true
     },
-    // --- ESTO ES LO QUE FALTABA PARA QUE FUNCIONE LA SEPARACIÓN ---
     type: {
         type: String,
         enum: ['gym', 'sport'],
         default: 'gym' // Por defecto todo es gym salvo que digamos lo contrario
     },
-    intensity: { type: String }, // Solo para sport
+    intensity: { type: String, default: 'Normal' },
     distance: { type: Number },  // Solo para sport
-    // ------------------------------------------------------------
+    caloriesBurned: { type: Number, default: 0 },
     exercises: [{
         name: String,
         sets: [{
@@ -44,5 +43,15 @@ const workoutLogSchema = mongoose.Schema({
 }, {
     timestamps: true
 });
+
+// 🔥 ÍNDICES PARA RENDIMIENTO 🔥
+
+// 1. Índice compuesto: Busca logs de un usuario específico ordenados por fecha descendente
+// (Acelera la carga del historial general)
+workoutLogSchema.index({ user: 1, date: -1 });
+
+// 2. Índice para gráficas específicas: Busca por usuario y filtra por nombre de ejercicio dentro del array
+// (Acelera el ProfileStats al buscar "Press Banca", por ejemplo)
+workoutLogSchema.index({ user: 1, "exercises.name": 1 });
 
 module.exports = mongoose.model('WorkoutLog', workoutLogSchema);

@@ -8,12 +8,11 @@ export default function Header({ user, setUser }) {
     // --- DATOS SEGUROS ---
     const stats = user.stats || {};
 
-    const level = user.level || 1; // Leemos de la raíz
-    const currentXP = user.currentXP || 0; // Leemos de la raíz
-    const nextLevelXP = user.nextLevelXP || 100; // Leemos de la raíz
+    const level = user.level || 1;
+    const currentXP = user.currentXP || 0;
+    const nextLevelXP = user.nextLevelXP || 100;
 
-    // 🔥 CORRECCIÓN AQUÍ: Leemos 'coins' de la raíz del usuario, no de stats
-    // Esto iguala el valor con el widget del Home.
+    // Leemos 'coins' de la raíz del usuario
     const coins = user.coins || 0;
 
     const username = user.username || user.name || "Usuario";
@@ -65,8 +64,9 @@ export default function Header({ user, setUser }) {
                 {/* --- GRUPO DERECHA: CAJAS COMPACTAS --- */}
                 <div className="flex flex-col items-end gap-1.5">
 
-                    {/* CAJA 1: MONEDAS */}
-                    <Link to="/shop">
+                    {/* CAJA 1: MONEDAS (AHORA LLEVA A GAMES) */}
+                    {/* 🔥 CAMBIO AQUÍ: De /shop a /games */}
+                    <Link to="/games">
                         <div className="w-20 h-7 flex items-center justify-center gap-1.5 bg-gray-900 border border-yellow-500/30 rounded-full shadow-sm active:scale-95 transition-transform hover:border-yellow-500">
                             <span className="text-white font-bold text-xs">{coins}</span>
                             <span className="text-xs">💰</span>

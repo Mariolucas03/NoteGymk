@@ -45,6 +45,11 @@ const GymSessionSchema = new mongoose.Schema({
     duration: Number,
     earnedXP: { type: Number, default: 0 },
     earnedCoins: { type: Number, default: 0 },
+    caloriesBurned: { type: Number, default: 0 },
+
+    // 🔥 AÑADIR ESTO:
+    intensity: { type: String, default: 'Normal' },
+
     exercises: [ExerciseSchema],
     timestamp: { type: Date, default: Date.now }
 }, { _id: false });

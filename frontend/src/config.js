@@ -1,8 +1,5 @@
 // frontend/src/config.js
 
-// ⚠️ CONFIRMA QUE ESTA ES TU IP ACTUAL DEL PC
-const MI_IP_LOCAL = '192.168.1.131';
-
-export const API_BASE_URL = window.location.hostname === 'localhost'
-    ? 'http://localhost:5000'
-    : `http://${MI_IP_LOCAL}:5000`;
+// En Vite, las variables de entorno se acceden con import.meta.env
+// Si VITE_API_URL existe (Producción), usa esa. Si no, usa localhost (Desarrollo).
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';

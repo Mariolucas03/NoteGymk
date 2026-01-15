@@ -1,22 +1,23 @@
 const mongoose = require('mongoose');
 
 const exerciseSchema = new mongoose.Schema({
-    name: { type: String, required: true }, // Ej: "Press Banca"
-    muscle: { type: String, required: true }, // Ej: "Pecho"
-    sets: { type: Number, default: 3 },     // Series objetivo
-    reps: { type: String, default: '10-12' }, // Reps objetivo (String por si pones 'Fallo')
-    targetWeight: { type: Number, default: 0 } // Peso meta (opcional)
+    name: { type: String, required: true },
+    muscle: { type: String, required: true },
+    sets: { type: Number, default: 3 },
+    reps: { type: String, default: '10-12' },
+    targetWeight: { type: Number, default: 0 }
 });
 
 const routineSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    name: { type: String, required: true }, // Ej: "Push Day"
-    exercises: [exerciseSchema],
+    name: { type: String, required: true },
 
-    // Stats rápidos
+    // 🔥 CAMPO NUEVO: Guardar el color elegido
+    color: { type: String, default: 'blue' },
+
+    exercises: [exerciseSchema],
     lastPerformed: { type: Date },
     timesCompleted: { type: Number, default: 0 },
-
     createdAt: { type: Date, default: Date.now }
 });
 

@@ -1,25 +1,28 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const levelService = require('../services/levelService');
-// 🔥 IMPORTAMOS LA FUNCIÓN MANUAL DEL SCHEDULER QUE ACABAMOS DE CREAR
+// Importamos la función manual del scheduler
 const { runNightlyMaintenance } = require('../utils/scheduler');
 
+// ==========================================
+// 1. OBTENER PERFIL (getMe)
+// ==========================================
 // @desc    Obtener datos del usuario actual (Con auto-reparación)
 const getMe = asyncHandler(async (req, res) => {
-    // 1. Ejecutar reparación de nivel por si la XP está desbordada
     const user = await levelService.ensureLevelConsistency(req.user._id);
-
-    // 2. Si hubo reparación usamos ese usuario, si no, buscamos el normal con populate
     let userToSend = user;
 
     if (!userToSend) {
         userToSend = await User.findById(req.user._id);
     }
 
-    // Aseguramos el populate del inventario
+    // Poblamos inventario y las solicitudes de misión para el buzón
     await userToSend.populate('inventory.item');
+    await userToSend.populate({
+        path: 'missionRequests',
+        populate: { path: 'user', select: 'username avatar' } // Para ver quién invita
+    });
 
-    // Quitamos el password por seguridad
     userToSend.password = undefined;
 
     if (userToSend) {
@@ -30,14 +33,12 @@ const getMe = asyncHandler(async (req, res) => {
     }
 });
 
-// @desc    Actualizar objetivos nutricionales (Macros)
+// ==========================================
+// 2. ACTUALIZAR MACROS
+// ==========================================
 const updateMacros = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id);
-
-    if (!user) {
-        res.status(404);
-        throw new Error('Usuario no encontrado');
-    }
+    if (!user) { res.status(404); throw new Error('Usuario no encontrado'); }
 
     const { calories, protein, carbs, fat, fiber } = req.body;
 
@@ -53,16 +54,16 @@ const updateMacros = asyncHandler(async (req, res) => {
 
     user.markModified('macros');
     const updatedUser = await user.save();
-
     res.status(200).json(updatedUser);
 });
 
-// @desc    Reclamar recompensa diaria
+// ==========================================
+// 3. RECOMPENSA DIARIA
+// ==========================================
 const claimDailyReward = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) { res.status(404); throw new Error('Usuario no encontrado'); }
 
-    // --- 1. NORMALIZAR FECHAS ---
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
 
@@ -70,7 +71,6 @@ const claimDailyReward = asyncHandler(async (req, res) => {
         user.dailyRewards = { claimedDays: [], lastClaimDate: null };
     }
 
-    // --- 2. VERIFICAR SI YA RECLAMÓ HOY ---
     if (user.dailyRewards.lastClaimDate) {
         const lastDate = new Date(user.dailyRewards.lastClaimDate);
         const lastDateStr = lastDate.toISOString().split('T')[0];
@@ -83,9 +83,7 @@ const claimDailyReward = asyncHandler(async (req, res) => {
         }
     }
 
-    // --- 3. CALCULAR RACHA Y DÍA ACTUAL ---
     let currentDay = 1;
-
     if (user.dailyRewards.lastClaimDate) {
         const lastDate = new Date(user.dailyRewards.lastClaimDate);
         const yesterday = new Date(now);
@@ -103,41 +101,39 @@ const claimDailyReward = asyncHandler(async (req, res) => {
         }
     }
 
-    // --- 4. DEFINIR PREMIOS ---
-    let rewardCoins = currentDay;
-    let rewardXP = currentDay * 10;
+    const rewardCoins = 0;
+    const rewardXP = 20;
+    const rewardGameCoins = 50;
 
-    if (currentDay === 7) {
-        rewardCoins += 5;
-        rewardXP += 50;
-    }
-
-    // --- 5. GUARDAR ---
     user.dailyRewards.claimedDays.push(currentDay);
     user.dailyRewards.lastClaimDate = now;
     await user.save();
 
-    // Sumar usando el servicio centralizado (que ya usa ROOT fields)
-    const result = await levelService.addRewards(user._id, rewardXP, rewardCoins, 0);
+    const result = await levelService.addRewards(
+        user._id,
+        rewardXP,
+        rewardCoins,
+        rewardGameCoins
+    );
 
     res.status(200).json({
         success: true,
         message: `¡Has reclamado el Día ${currentDay}!`,
         user: result.user,
-        reward: { xp: rewardXP, coins: rewardCoins, day: currentDay }
+        reward: { xp: rewardXP, coins: rewardCoins, gameCoins: rewardGameCoins, day: currentDay }
     });
 });
 
-// @desc    Añadir recompensa genérica (Juegos, Ruleta, etc.)
+// ==========================================
+// 4. RECOMPENSA JUEGOS
+// ==========================================
 const addGameReward = asyncHandler(async (req, res) => {
     const { coins, xp, gameCoins } = req.body;
-
-    // levelService ya escribe en root, así que esto es seguro
     const result = await levelService.addRewards(
         req.user._id,
         Number(xp || 0),
-        Number(coins || 0),      // Monedas Reales
-        Number(gameCoins || 0)   // Fichas Virtuales
+        Number(coins || 0),
+        Number(gameCoins || 0)
     );
 
     res.status(200).json({
@@ -145,11 +141,13 @@ const addGameReward = asyncHandler(async (req, res) => {
         user: result.user,
         leveledUp: result.leveledUp,
         newBalance: result.user.coins,
-        newGameCoins: result.user.gameCoins // CORRECCIÓN: leer de root
+        newGameCoins: result.user.gameCoins
     });
 });
 
-// @desc    Actualizar datos físicos
+// ==========================================
+// 5. ACTUALIZAR DATOS FÍSICOS
+// ==========================================
 const updatePhysicalStats = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) { res.status(404); throw new Error('Usuario no encontrado'); }
@@ -166,8 +164,9 @@ const updatePhysicalStats = asyncHandler(async (req, res) => {
     res.status(200).json(updatedUser);
 });
 
-// --- FUNCIONES LEGACY / GAME OVER ---
-
+// ==========================================
+// 6. GAME OVER / REDENCIÓN
+// ==========================================
 const setRedemptionMission = asyncHandler(async (req, res) => {
     const { mission } = req.body;
     if (!mission || mission.trim() === '') return res.status(400).json({ message: "La misión es obligatoria" });
@@ -180,7 +179,6 @@ const setRedemptionMission = asyncHandler(async (req, res) => {
 
 const reviveUser = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id);
-    // CORRECCIÓN: Usar campos raíz
     user.hp = 20;
     user.lives = 20;
     await user.save();
@@ -191,7 +189,6 @@ const updateStatsManual = asyncHandler(async (req, res) => {
     const { hp, xp, coins } = req.body;
     const user = await User.findById(req.user._id);
 
-    // CORRECCIÓN: Usar campos raíz
     if (hp !== undefined) {
         user.hp = hp;
         user.lives = hp;
@@ -203,52 +200,41 @@ const updateStatsManual = asyncHandler(async (req, res) => {
     res.json(user);
 });
 
-// @desc    DEBUG: Simular que la última conexión fue AYER
-// @route   POST /api/users/debug/yesterday
+// ==========================================
+// 7. DEBUG / TESTING
+// ==========================================
 const simulateYesterday = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id);
-
-    // Ponemos la fecha de último log a AYER
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
 
     user.streak.lastLogDate = yesterday;
-    // Opcional: Ponemos la racha en 1 para ver cómo sube a 2
     if (!user.streak.current || user.streak.current === 0) user.streak.current = 1;
 
-    await user.save();
+    if (user.dailyRewards) {
+        user.dailyRewards.lastClaimDate = yesterday;
+    }
 
+    await user.save();
     res.json({
-        message: "✅ Modo prueba activado: El sistema cree que entraste ayer.",
+        message: "✅ Modo prueba: Última conexión y reclamo seteados a AYER.",
         streak: user.streak
     });
 });
 
-// @desc    DEBUG: Modificar racha manualmente
-// @route   PUT /api/users/debug/streak
 const setManualStreak = asyncHandler(async (req, res) => {
     const { days } = req.body;
     const user = await User.findById(req.user._id);
-
     user.streak.current = parseInt(days);
-    // IMPORTANTE: Ponemos lastLogDate a hoy para que no sume +1 automáticamente al refrescar
     user.streak.lastLogDate = new Date();
-
     await user.save();
     res.json({ message: `Racha forzada a ${days}`, streak: user.streak });
 });
 
-// @desc    DEBUG: Forzar el paso de la noche (Castigos)
-// @route   POST /api/users/debug/force-night
 const forceNightlyMaintenance = asyncHandler(async (req, res) => {
     console.log("🔧 DEBUG: Forzando mantenimiento nocturno...");
-
-    // Llamamos a la función importada de scheduler.js
     const result = await runNightlyMaintenance();
-
-    // Devolvemos el usuario actualizado para que el frontend lo vea al instante
     const updatedUser = await User.findById(req.user._id);
-
     res.json({
         message: "🌃 Mantenimiento forzado ejecutado.",
         result,
@@ -256,16 +242,19 @@ const forceNightlyMaintenance = asyncHandler(async (req, res) => {
     });
 });
 
+// ==========================================
+// EXPORT FINAL (¡SIEMPRE AL FINAL!)
+// ==========================================
 module.exports = {
     getMe,
     updateMacros,
     claimDailyReward,
     addGameReward,
+    updatePhysicalStats,
     setRedemptionMission,
     reviveUser,
     updateStatsManual,
-    updatePhysicalStats,
     simulateYesterday,
     setManualStreak,
-    forceNightlyMaintenance // Exportamos la función para que la ruta funcione
+    forceNightlyMaintenance
 };

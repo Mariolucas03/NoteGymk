@@ -1,84 +1,118 @@
-/* Importamos la fuente Inter (opcional, pero queda bien dejarla) */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
 
-/* Las 3 directivas obligatorias de Tailwind */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* --- CUSTOM CALENDAR STYLES --- */
-.react-calendar {
-    background: transparent !important;
-    border: none !important;
-    width: 100% !important;
-    font-family: inherit !important;
+/* --- VARIABLES DE ENTORNO (Soporte básico) --- */
+:root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
 }
 
-/* Botones de navegación (Mes anterior/siguiente) */
-.react-calendar__navigation button {
-    color: white !important;
-    min-width: 44px;
-    background: none;
-    font-size: 16px;
-    margin-top: 8px;
+/* --- ESTILOS GLOBALES BASE --- */
+body {
+    @apply bg-black text-zinc-200 font-sans;
+    overscroll-behavior-y: none;
+    /* Evita rebote en iOS */
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.react-calendar__navigation button:enabled:hover,
-.react-calendar__navigation button:enabled:focus {
-    background-color: #1f2937 !important;
-    /* gray-800 */
-    border-radius: 8px;
+#root {
+    height: 100dvh;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Días de la semana (L M X J V S D) */
-.react-calendar__month-view__weekdays__weekday {
-    color: #6b7280;
-    /* gray-500 */
-    text-decoration: none !important;
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    font-weight: bold;
+/* --- ÁREAS SEGURAS (AJUSTE AGRESIVO MANUAL) --- */
+
+/* HEADER: Forzamos 50px. Esto baja el header para que NO toque la hora/batería. */
+.safe-top {
+    padding-top: max(50px, var(--sat)) !important;
 }
 
-.react-calendar__month-view__weekdays__weekday abbr {
-    text-decoration: none;
+/* FOOTER: Forzamos 15px (muy poco). Esto PEGA los iconos abajo, eliminando el hueco negro grande. */
+.safe-bottom {
+    padding-bottom: 0px !important;
 }
 
-/* Celdas de días */
-.react-calendar__tile {
-    color: #e5e7eb;
-    /* gray-200 */
-    padding: 10px 6px;
-    background: none;
-    text-align: center;
-    line-height: 16px;
-    font-size: 0.9rem;
-    border-radius: 8px;
-    transition: all 0.2s;
+/* PADDING CONTENIDO: Para que el footer no tape el final de la lista al hacer scroll */
+.pb-safe-content {
+    padding-bottom: 100px !important;
 }
 
-/* Hover en días */
-.react-calendar__tile:enabled:hover,
-.react-calendar__tile:enabled:focus {
-    background-color: #374151 !important;
-    /* gray-700 */
-    color: white;
+/* --- FIX ZOOM INPUTS IOS --- */
+@media screen and (max-width: 768px) {
+
+    input,
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
 }
 
-/* Día seleccionado */
-.react-calendar__tile--active {
-    background: #2563eb !important;
-    /* blue-600 */
-    color: white !important;
-    font-weight: bold;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+/* --- SCROLLBAR PERSONALIZADA --- */
+@layer utilities {
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+        @apply bg-black;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        @apply bg-zinc-800 rounded-[10px];
+        border: 1px solid transparent;
+        background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        @apply bg-yellow-500;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
 }
 
-/* Día actual (Hoy) */
-.react-calendar__tile--now {
-    background: #1e3a8a !important;
-    /* blue-900 */
-    color: #60a5fa !important;
-    /* blue-400 */
-    font-weight: bold;
+.animate-in {
+    animation-duration: 0.3s;
+    animation-fill-mode: forwards;
+}
+
+@layer base {
+
+    input,
+    select,
+    textarea {
+        @apply bg-zinc-950 border border-zinc-800 text-white;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+        @apply border-yellow-500 outline-none;
+    }
+}
+
+.custom-scrollbar {
+    -webkit-overflow-scrolling: touch;
+}
+
+.select-none {
+    -webkit-user-select: none;
+    user-select: none;
 }

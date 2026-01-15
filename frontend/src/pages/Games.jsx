@@ -1,120 +1,158 @@
-import { useOutletContext, Link } from 'react-router-dom';
-import { Gamepad2, Dices, CircleDollarSign, Ticket, ChevronLeft, Disc, Spade, Zap } from 'lucide-react';
+import { useOutletContext, Link, useNavigate } from 'react-router-dom';
+import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Lock, CheckCircle2, ArrowRight } from 'lucide-react';
 
 export default function Games() {
     const { user } = useOutletContext();
-    const gameCoins = user?.stats?.gameCoins || 0;
+    const navigate = useNavigate();
+
+    // --- LÓGICA DE BLOQUEO ---
+    const missions = user?.dailyMissions || [];
+    const totalMissions = missions.length;
+    const completedMissions = missions.filter(m => m.completed).length;
+
+    // Si no hay misiones (0), consideramos que está desbloqueado
+    const progress = totalMissions > 0 ? (completedMissions / totalMissions) : 1;
+    const isLocked = progress < 0.75;
+
+    const percentage = Math.round(progress * 100);
 
     const gamesList = [
         {
-            id: 'fortune-wheel',
-            name: 'La Ruleta de la Suerte',
-            desc: 'Gira y multiplica tus ganancias diarias.',
-            icon: <CircleDollarSign size={40} className="text-yellow-400" />,
-            color: 'bg-yellow-900/20 border-yellow-500/30',
-            btnColor: 'bg-yellow-500 hover:bg-yellow-400',
-            status: 'Disponible'
+            id: 'roulette',
+            name: 'Ruleta',
+            desc: 'Casino Royal',
+            icon: <Disc size={32} className="text-red-400" />,
+            color: 'from-red-900/40 to-black border-red-500/30',
+            glow: 'shadow-red-500/20'
+        },
+        {
+            id: 'blackjack',
+            name: 'Blackjack',
+            desc: 'Suma 21',
+            icon: <Spade size={32} className="text-green-400" />,
+            color: 'from-green-900/40 to-black border-green-500/30',
+            glow: 'shadow-green-500/20'
         },
         {
             id: 'slots',
             name: 'Neon Slots',
-            desc: 'Alinea los símbolos y gana el Jackpot.',
-            icon: <Zap size={40} className="text-pink-400" />,
-            color: 'bg-pink-900/20 border-pink-500/30',
-            btnColor: 'bg-pink-600 hover:bg-pink-500',
-            status: 'Disponible'
-        },
-        {
-            id: 'blackjack',
-            name: 'Blackjack 21',
-            desc: 'Vence al crupier sumando 21.',
-            icon: <Spade size={40} className="text-green-400" />,
-            color: 'bg-green-900/20 border-green-500/30',
-            btnColor: 'bg-green-600 hover:bg-green-500',
-            status: 'Disponible'
-        },
-        {
-            id: 'roulette',
-            name: 'Ruleta Casino',
-            desc: 'Apuesta al rojo o negro clásico.',
-            icon: <Disc size={40} className="text-red-400" />,
-            color: 'bg-red-900/20 border-red-500/30',
-            btnColor: 'bg-red-600 hover:bg-red-500',
-            status: 'Disponible'
+            desc: 'Jackpot',
+            icon: <Zap size={32} className="text-fuchsia-400" />,
+            color: 'from-fuchsia-900/40 to-black border-fuchsia-500/30',
+            glow: 'shadow-fuchsia-500/20'
         },
         {
             id: 'dice',
-            name: 'Dados Rápidos',
-            desc: 'Saca mayor puntuación que la banca.',
-            icon: <Dices size={40} className="text-blue-400" />,
-            color: 'bg-blue-900/20 border-blue-500/30',
-            btnColor: 'bg-blue-600 hover:bg-blue-500',
-            status: 'Disponible'
+            name: 'Dados',
+            desc: 'High / Low',
+            icon: <Dices size={32} className="text-blue-400" />,
+            color: 'from-blue-900/40 to-black border-blue-500/30',
+            glow: 'shadow-blue-500/20'
         },
         {
             id: 'scratch',
-            name: 'Rasca y Gana',
-            desc: 'Encuentra 3 símbolos iguales.',
-            icon: <Ticket size={40} className="text-purple-400" />,
-            color: 'bg-purple-900/20 border-purple-500/30',
-            btnColor: 'bg-purple-600 hover:bg-purple-500',
-            status: 'Disponible'
+            name: 'Rasca',
+            desc: 'Premio Rápido',
+            icon: <Ticket size={32} className="text-purple-400" />,
+            color: 'from-purple-900/40 to-black border-purple-500/30',
+            glow: 'shadow-purple-500/20'
+        },
+        {
+            id: 'fortune-wheel',
+            name: 'Fortuna',
+            desc: 'Giro Diario',
+            icon: <CircleDollarSign size={32} className="text-yellow-400" />,
+            color: 'from-yellow-900/40 to-black border-yellow-500/30',
+            glow: 'shadow-yellow-500/20'
         }
     ];
 
-    return (
-        <div className="space-y-6 pb-20 animate-in fade-in select-none">
-            {/* Cabecera */}
-            <div className="flex justify-between items-start mb-6">
-                <div className="flex items-center gap-3">
-                    <Link to="/" className="bg-gray-900 p-2 rounded-xl border border-gray-800 text-gray-400 hover:text-white transition-colors">
-                        <ChevronLeft size={24} />
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                            <Gamepad2 className="text-purple-500" /> Sala de Juegos
-                        </h1>
-                        <p className="text-gray-400 text-xs">Diviértete y gana premios</p>
+    // --- VISTA BLOQUEADA ---
+    if (isLocked) {
+        return (
+            <div className="fixed inset-0 bg-black flex flex-col items-center justify-center p-6 select-none pt-20">
+                <div className="w-full max-w-sm bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 text-center shadow-2xl relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-b from-red-500/10 to-transparent pointer-events-none"></div>
+                    <div className="relative z-10 flex flex-col items-center gap-6">
+                        <div className="w-20 h-20 bg-zinc-950 rounded-full border-2 border-red-500/50 flex items-center justify-center shadow-[0_0_30px_rgba(239,68,68,0.3)]">
+                            <Lock size={40} className="text-red-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-2">ARCADE BLOQUEADO</h2>
+                            <p className="text-sm text-zinc-400 leading-relaxed">Completa el <strong className="text-white">75%</strong> de tus misiones.</p>
+                        </div>
+                        <div className="w-full bg-zinc-800 h-4 rounded-full overflow-hidden border border-white/5 relative">
+                            <div className="h-full bg-gradient-to-r from-red-600 to-orange-500 transition-all duration-1000 ease-out" style={{ width: `${percentage}%` }} />
+                            <div className="absolute top-0 bottom-0 left-[75%] w-0.5 bg-white/50 z-20"></div>
+                        </div>
+                        <div className="flex justify-between w-full text-xs font-bold text-zinc-500 px-1 uppercase tracking-wider">
+                            <span>Progreso: {percentage}%</span>
+                            <span>Meta: 75%</span>
+                        </div>
+                        <button onClick={() => navigate('/missions')} className="w-full py-4 bg-white text-black font-black rounded-xl uppercase tracking-widest shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
+                            Ver Misiones <ArrowRight size={18} />
+                        </button>
                     </div>
                 </div>
+            </div>
+        );
+    }
 
-                {/* SALDO FICHAS */}
-                <div className="bg-purple-900/30 border border-purple-500/30 px-3 py-1.5 rounded-xl flex flex-col items-end shadow-sm">
-                    <span className="text-xl font-black text-white leading-none">{gameCoins}</span>
-                    <span className="text-purple-400 text-[10px] font-bold uppercase leading-none">Fichas</span>
+    // --- VISTA DESBLOQUEADA (FIJA) ---
+    return (
+        // 🔥 CAMBIO CLAVE: pt-40 para bajar todo el contenido y que no se pegue al header
+        <div className="fixed inset-0 bg-black flex flex-col pt-32 pb-20 overflow-hidden font-sans select-none">
+
+            {/* CABECERA COMPACTA */}
+            <div className="px-6 mb-4 shrink-0 flex justify-between items-end">
+                <div>
+                    <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-500 italic uppercase tracking-tighter">
+                        ARCADE
+                    </h1>
+                    <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+                        <CheckCircle2 size={12} className="text-green-500" /> Zona Desbloqueada
+                    </p>
                 </div>
             </div>
 
-            {/* Grid de Juegos */}
-            <div className="grid grid-cols-1 gap-4">
-                {gamesList.map((game) => (
-                    <div key={game.id} className={`p-4 rounded-2xl border ${game.color} flex items-center gap-4 relative overflow-hidden group transition-all hover:scale-[1.02] active:scale-[0.98]`}>
-                        {/* Icono con fondo */}
-                        <div className="bg-gray-900/50 p-3 rounded-xl backdrop-blur-sm shadow-inner">
-                            {game.icon}
-                        </div>
+            {/* GRID DE JUEGOS (2 COLUMNAS) */}
+            <div className="flex-1 px-4 pb-4">
+                <div className="grid grid-cols-2 gap-3 h-full max-w-md mx-auto content-start">
+                    {gamesList.map((game) => (
+                        <Link
+                            key={game.id}
+                            to={`/games/${game.id}`}
+                            className={`
+                                relative p-[1px] rounded-2xl bg-gradient-to-b ${game.color} 
+                                transition-all duration-200 active:scale-95 group h-full max-h-[140px]
+                            `}
+                        >
+                            <div className="bg-black/90 backdrop-blur-md rounded-2xl h-full w-full flex flex-col items-center justify-center gap-3 relative overflow-hidden border border-white/5 p-2">
 
-                        {/* Textos */}
-                        <div className="flex-1">
-                            <h3 className="text-white font-bold text-lg">{game.name}</h3>
-                            <p className="text-gray-400 text-xs">{game.desc}</p>
-                        </div>
+                                {/* Brillo Superior */}
+                                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
 
-                        {/* BOTÓN INTELIGENTE */}
-                        {game.status === 'Disponible' ? (
-                            <Link
-                                to={`/games/${game.id}`}
-                                className={`${game.btnColor} text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg transition-colors flex items-center justify-center`}
-                            >
-                                Jugar
-                            </Link>
-                        ) : (
-                            <button disabled className="bg-gray-800 text-gray-500 px-4 py-2 rounded-lg font-bold text-sm cursor-not-allowed border border-gray-700">
-                                Bloq.
-                            </button>
-                        )}
-                    </div>
-                ))}
+                                {/* Icono */}
+                                <div className={`p-3 rounded-full bg-zinc-900 border border-white/5 shadow-lg ${game.glow} group-hover:scale-110 transition-transform duration-300`}>
+                                    {game.icon}
+                                </div>
+
+                                {/* Texto */}
+                                <div className="text-center z-10">
+                                    <h3 className="text-white font-black text-sm uppercase italic tracking-tighter leading-none mb-1">
+                                        {game.name}
+                                    </h3>
+                                    <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-wide">{game.desc}</p>
+                                </div>
+
+                                {/* Decoración Fondo */}
+                                <div className="absolute -right-2 -bottom-2 opacity-5 rotate-12 scale-150 pointer-events-none grayscale group-hover:grayscale-0 transition-all duration-500">
+                                    {game.icon}
+                                </div>
+                            </div>
+                        </Link>
+                    ))}
+                </div>
             </div>
         </div>
     );

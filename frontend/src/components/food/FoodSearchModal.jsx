@@ -1,268 +1,288 @@
-import { useState, useEffect, useRef } from 'react';
-import { Plus, X, Camera, Sparkles, Loader2, Save, ArrowLeft, Trash2, Edit2, RotateCw, PenTool, Flame, Beef, Wheat, Droplet, Leaf } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Search, Plus, X, Flame, Wheat, Droplet, Leaf, Sparkles, ScanBarcode, ArrowRight, Camera, Image as ImageIcon, Trash2, BrainCircuit, Save, Check } from 'lucide-react';
 import api from '../../services/api';
 
-export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowToast }) {
-    const [view, setView] = useState('list'); // 'list', 'scan', 'preview', 'result', 'create'
-    const [savedFoods, setSavedFoods] = useState([]);
+// --- COMPONENTE INTERNO: ÍTEM DESLIZABLE ---
+const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
+    const [offsetX, setOffsetX] = useState(0);
+    const [isDragging, setIsDragging] = useState(false);
+    const startX = useRef(0);
+    const startY = useRef(0);
 
-    // Datos escáner
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [previewUrl, setPreviewUrl] = useState(null);
-    const [userContext, setUserContext] = useState('');
+    // Cálculos de macros (asegurando ceros)
+    const p = Math.round(item.protein || item.macros?.protein || 0);
+    const c = Math.round(item.carbs || item.macros?.carbs || 0);
+    const f = Math.round(item.fat || item.macros?.fat || 0);
+    const fib = Math.round(item.fiber || item.macros?.fiber || 0);
 
-    // Datos selección / edición
-    const [selectedFood, setSelectedFood] = useState(null);
-    const [quantity, setQuantity] = useState(1);
+    const handleTouchStart = (e) => { startX.current = e.touches[0].clientX; startY.current = e.touches[0].clientY; setIsDragging(true); };
+    const handleTouchMove = (e) => {
+        if (!isDragging) return;
+        const diffX = e.touches[0].clientX - startX.current;
+        const diffY = e.touches[0].clientY - startY.current;
+        if (Math.abs(diffY) > Math.abs(diffX)) return;
+        if (Math.abs(diffX) > 10 && Math.abs(diffX) < 150) setOffsetX(diffX);
+    };
+    const handleTouchEnd = () => { setIsDragging(false); finishDrag(); };
+    const handleMouseDown = (e) => { startX.current = e.clientX; startY.current = e.clientY; setIsDragging(true); };
+    const handleMouseMove = (e) => { if (!isDragging) return; const diffX = e.clientX - startX.current; if (Math.abs(diffX) < 150) setOffsetX(diffX); };
+    const handleMouseUp = () => { setIsDragging(false); finishDrag(); };
+    const handleMouseLeave = () => { if (isDragging) { setIsDragging(false); finishDrag(); } };
 
-    // Datos creación manual
-    const [newFoodData, setNewFoodData] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '' });
-
-    const fileInputRef = useRef(null);
-
-    useEffect(() => { fetchSavedFoods(); }, []);
-
-    const fetchSavedFoods = async () => {
-        try {
-            const res = await api.get('/food/saved');
-            setSavedFoods(res.data);
-        } catch (error) { console.error(error); }
+    const finishDrag = () => {
+        if (Math.abs(offsetX) > 80) {
+            setOffsetX(offsetX > 0 ? 500 : -500);
+            setTimeout(() => onDelete(item._id), 300);
+        } else { setOffsetX(0); }
     };
 
-    // --- ACCIONES GENERALES ---
+    const trashOpacity = Math.min(Math.abs(offsetX) / 50, 1);
+    const trashScale = Math.min(Math.abs(offsetX) / 50, 1.2);
 
-    const handleAdd = async () => {
-        if (!selectedFood) return;
+    return (
+        <div className="relative w-full mb-2 h-[72px] select-none overflow-hidden rounded-2xl touch-pan-y">
+            <div className="absolute inset-0 bg-red-600 flex items-center justify-between px-6 rounded-2xl transition-colors">
+                <Trash2 className="text-white transition-transform" style={{ opacity: trashOpacity, transform: `scale(${trashScale})` }} size={24} />
+                <Trash2 className="text-white transition-transform" style={{ opacity: trashOpacity, transform: `scale(${trashScale})` }} size={24} />
+            </div>
+            <div
+                onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+                onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseLeave}
+                style={{ transform: `translateX(${offsetX}px)`, transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' }}
+                className="absolute inset-0 bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex justify-between items-center z-10"
+            >
+                <div className="pointer-events-none">
+                    <p className="font-bold text-white text-sm truncate w-56">{item.name}</p>
+                    <div className="flex items-center gap-3 mt-1.5 text-[10px] font-black uppercase tracking-wide">
+                        <span className="text-zinc-400">KCAL: {Math.round(item.calories)}</span>
+                        <span className="text-blue-400">P: {p}</span>
+                        <span className="text-yellow-400">C: {c}</span>
+                        <span className="text-red-400">G: {f}</span>
+                        <span className="text-green-500">F: {fib}</span>
+                    </div>
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); if (Math.abs(offsetX) === 0) onAdd(item); }} className="bg-white text-black p-1.5 rounded-lg shrink-0 hover:bg-zinc-200 active:scale-90 transition-transform cursor-pointer">
+                    <Plus size={16} strokeWidth={3} />
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// --- COMPONENTE PRINCIPAL ---
+export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowToast }) {
+    const [mode, setMode] = useState('search');
+
+    // Búsqueda
+    const [query, setQuery] = useState('');
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    // IA
+    const [aiInput, setAiInput] = useState('');
+    const [aiImage, setAiImage] = useState(null);
+    const [aiImagePreview, setAiImagePreview] = useState(null);
+    const [aiLoading, setAiLoading] = useState(false);
+    const fileInputRef = useRef(null);
+
+    // IA Helper
+    const [showAiHelper, setShowAiHelper] = useState(false);
+    const [aiDescription, setAiDescription] = useState('');
+    const [aiHelperLoading, setAiHelperLoading] = useState(false);
+
+    // Formulario
+    const [manualForm, setManualForm] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1 });
+    const searchInputRef = useRef(null);
+
+    useEffect(() => { if (mode === 'search' && query.trim() === '') fetchSavedFoods(); }, [mode, query]);
+    const fetchSavedFoods = async () => { setLoading(true); try { const res = await api.get('/food/saved'); setResults(res.data); } catch (e) { console.error(e); } finally { setLoading(false); } };
+
+    useEffect(() => { const timer = setTimeout(() => { if (query.trim().length > 0 && mode === 'search') searchFood(); }, 500); return () => clearTimeout(timer); }, [query]);
+    const searchFood = async () => { setLoading(true); try { const res = await api.get(`/food/search?query=${query}`); setResults(res.data); } catch (e) { console.error(e); } finally { setLoading(false); } };
+
+    // --- ACCIONES GENERALES ---
+    const handleAddFood = async (food) => {
         try {
-            await api.post('/food/add', {
-                mealId,
-                foodId: (selectedFood._id === 'ai_temp' || selectedFood._id === 'manual_temp') ? null : selectedFood._id,
-                rawFood: (selectedFood._id === 'ai_temp' || selectedFood._id === 'manual_temp') ? selectedFood : null,
-                quantity
-            });
-            onFoodAdded();
-            onClose();
-            onShowToast("Añadido al registro diario");
+            const foodData = { name: food.name, calories: Number(food.calories), protein: Number(food.protein || 0), carbs: Number(food.carbs || 0), fat: Number(food.fat || 0), fiber: Number(food.fiber || 0), quantity: 1 };
+            await api.post(`/food/log/${mealId}`, foodData);
+            onFoodAdded(); onShowToast("Añadido correctamente", "success"); onClose();
         } catch (error) { onShowToast("Error al añadir", "error"); }
     };
 
-    const handleSaveToDb = async () => {
-        if (!selectedFood) return;
-        try {
-            const res = await api.post('/food/save', selectedFood);
-            onShowToast("Comida guardada");
-            setSelectedFood({ ...res.data, icon: '🍽️' });
-            fetchSavedFoods();
-        } catch (error) { onShowToast("Error al guardar", "error"); }
+    const handleDeleteSavedFood = async (id) => {
+        try { await api.delete(`/food/saved/${id}`); setResults(prev => prev.filter(item => item._id !== id)); onShowToast("Alimento eliminado", "info"); }
+        catch (e) { onShowToast("No se pudo eliminar", "error"); fetchSavedFoods(); }
     };
 
-    const handleDeleteFood = async (id, e) => {
-        e.stopPropagation();
-        if (!window.confirm("¿Borrar de la lista?")) return;
+    // --- ACCIÓN 1: ESCANEAR (AHORA LLEVA A REVISIÓN) ---
+    const handleAiScanSubmit = async () => {
+        if (!aiInput.trim() && !aiImage) return;
+        setAiLoading(true);
         try {
-            await api.delete(`/food/saved/${id}`);
-            setSavedFoods(prev => prev.filter(food => food._id !== id));
-            onShowToast("Alimento eliminado");
-        } catch (error) { onShowToast("Error al eliminar", "error"); }
-    };
+            let analyzedData = null;
+            if (aiImage) {
+                const formData = new FormData();
+                formData.append('text', aiInput);
+                formData.append('image', aiImage);
+                const res = await api.post('/food/analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                analyzedData = res.data;
+            } else {
+                const res = await api.post('/food/analyze-text', { text: aiInput });
+                if (res.data.type === 'success') { analyzedData = res.data.data; analyzedData.name = analyzedData.name || aiInput; }
+            }
 
-    // --- LOGICA IA (ESCANEAR) ---
-    const handleFileSelect = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        setPreviewUrl(URL.createObjectURL(file));
-        setSelectedFile(file);
-        setView('preview');
-    };
+            if (!analyzedData || analyzedData.calories === undefined) throw new Error("No se identificó el alimento");
 
-    const handleAnalyze = async () => {
-        if (!selectedFile) return;
-        setView('scan');
-        const formData = new FormData();
-        formData.append('image', selectedFile);
-        formData.append('context', userContext);
+            setManualForm({
+                name: analyzedData.name || "Alimento Detectado",
+                calories: analyzedData.calories,
+                protein: analyzedData.protein || 0,
+                carbs: analyzedData.carbs || 0,
+                fat: analyzedData.fat || 0,
+                fiber: analyzedData.fiber || 0,
+                quantity: 1
+            });
 
-        try {
-            const res = await api.post('/food/analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-            setSelectedFood({ ...res.data, _id: 'ai_temp', icon: '✨' });
-            setView('result');
+            onShowToast("¡Analizado! Revisa los datos.", "success");
+            setMode('review');
+
         } catch (error) {
-            onShowToast("Error al escanear", "error");
-            setView('list');
+            console.error(error);
+            onShowToast("Error al procesar. Intenta de nuevo.", "error");
+        } finally {
+            setAiLoading(false);
         }
     };
 
-    // --- LOGICA MANUAL (CREAR) ---
-    const handleCreateManual = () => {
-        if (!newFoodData.name || !newFoodData.calories) return alert("Nombre y Calorías obligatorios");
-
-        const manualFood = {
-            _id: 'manual_temp',
-            name: newFoodData.name,
-            calories: Number(newFoodData.calories),
-            protein: Number(newFoodData.protein || 0),
-            carbs: Number(newFoodData.carbs || 0),
-            fat: Number(newFoodData.fat || 0),
-            fiber: Number(newFoodData.fiber || 0),
-            servingSize: '1 ración',
-            icon: '📝'
-        };
-        setSelectedFood(manualFood);
-        setView('result'); // Ir a vista final para confirmar/añadir
+    // --- ACCIONES DE REVISIÓN / MANUAL ---
+    const handleAddToMealNow = async () => {
+        if (!manualForm.name.trim() || manualForm.calories === '') { onShowToast("Nombre y Calorías obligatorios", "error"); return; }
+        try {
+            const foodData = { ...manualForm, calories: Number(manualForm.calories), protein: Number(manualForm.protein), carbs: Number(manualForm.carbs), fat: Number(manualForm.fat), fiber: Number(manualForm.fiber) };
+            await api.post(`/food/log/${mealId}`, foodData);
+            onFoodAdded(); onShowToast("Añadido a la comida", "success"); onClose();
+        } catch (e) { onShowToast("Error al añadir", "error"); }
     };
 
-    useEffect(() => { return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }; }, [previewUrl]);
+    const handleSaveToList = async () => {
+        if (!manualForm.name.trim() || manualForm.calories === '') { onShowToast("Nombre y Calorías obligatorios", "error"); return; }
+        try {
+            const foodData = { ...manualForm, calories: Number(manualForm.calories), protein: Number(manualForm.protein), carbs: Number(manualForm.carbs), fat: Number(manualForm.fat), fiber: Number(manualForm.fiber), servingSize: '1 ración' };
+            await api.post('/food/save', foodData);
+            onShowToast("Guardado en tu lista", "success");
+            setMode('search'); setQuery(manualForm.name);
+            const res = await api.get(`/food/search?query=${manualForm.name}`);
+            setResults(res.data);
+            setManualForm({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1 });
+        } catch (e) { onShowToast("Error al guardar", "error"); }
+    };
+
+    const handleAiAutofill = async () => {
+        if (!aiDescription.trim()) return;
+        setAiHelperLoading(true);
+        try {
+            const res = await api.post('/food/analyze-text', { text: aiDescription });
+            if (res.data.type === 'success') {
+                const d = res.data.data;
+                setManualForm(p => ({ ...p, calories: d.calories || p.calories, protein: d.protein || p.protein, carbs: d.carbs || p.carbs, fat: d.fat || p.fat, fiber: d.fiber || p.fiber }));
+                setShowAiHelper(false); onShowToast("¡Macros calculados!", "success");
+            }
+        } catch (e) { onShowToast("Error IA", "error"); } finally { setAiHelperLoading(false); }
+    };
+
+    const handleImageUpload = (e) => { const f = e.target.files[0]; if (f) { setAiImage(f); setAiImagePreview(URL.createObjectURL(f)); } };
+    const clearImage = () => { setAiImage(null); setAiImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ""; };
 
     return (
-        <div className="fixed inset-0 z-[60] bg-black/95 backdrop-blur-sm flex flex-col animate-in slide-in-from-bottom duration-300">
-
-            {/* HEADER */}
-            <div className="bg-gray-900 p-4 border-b border-gray-800 flex items-center justify-between">
-                {view === 'list' ? (
-                    <span className="font-bold text-white text-lg">Añadir Alimento</span>
-                ) : (
-                    <button onClick={() => { setView('list'); setSelectedFood(null); }} className="flex items-center gap-2 text-gray-400">
-                        <ArrowLeft size={20} /> Volver
-                    </button>
-                )}
-                <button onClick={onClose} className="p-2 rounded-full bg-gray-800 text-gray-400"><X size={20} /></button>
+        <div className="flex flex-col h-full w-full bg-zinc-950 text-white animate-in slide-in-from-bottom-10 duration-200">
+            <div className="px-5 py-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
+                <h2 className="text-lg font-black uppercase tracking-wider text-white">
+                    {mode === 'review' ? 'Revisar Datos' : 'Añadir Alimento'}
+                </h2>
+                <button onClick={onClose} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800 transition-colors"><X size={20} /></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col">
+            {mode !== 'review' && (
+                <div className="p-4 shrink-0">
+                    <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+                        <button onClick={() => setMode('search')} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${mode === 'search' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500'}`}>Buscar</button>
+                        <button onClick={() => setMode('ai')} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1 ${mode === 'ai' ? 'bg-blue-900/30 text-blue-400 shadow-md border border-blue-500/30' : 'text-zinc-500'}`}><Sparkles size={12} /> IA Scan</button>
+                        <button onClick={() => setMode('manual')} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${mode === 'manual' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500'}`}>Manual</button>
+                    </div>
+                </div>
+            )}
 
-                {/* VISTA 1: MENU PRINCIPAL */}
-                {view === 'list' && (
-                    <>
-                        {/* BOTONES DE ACCIÓN RÁPIDA */}
-                        <div className="grid grid-cols-2 gap-3 mb-6">
-                            <div onClick={() => fileInputRef.current.click()} className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 transition-transform border border-blue-500/30">
-                                <Camera size={28} className="text-blue-100" />
-                                <span className="text-white font-bold text-sm">Escanear IA</span>
-                            </div>
-                            <div onClick={() => setView('create')} className="bg-gradient-to-br from-gray-800 to-gray-700 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 transition-transform border border-gray-600">
-                                <PenTool size={28} className="text-gray-200" />
-                                <span className="text-white font-bold text-sm">Crear Manual</span>
-                            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-20">
+
+                {mode === 'search' && (
+                    <div className="space-y-4 animate-in fade-in duration-300">
+                        <div className="relative">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                            <input ref={searchInputRef} type="text" placeholder="Buscar en mis alimentos..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white pl-11 pr-4 py-4 rounded-2xl outline-none focus:border-zinc-600 transition-all font-bold text-sm placeholder-zinc-600" />
                         </div>
-
-                        <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
-
-                        <h4 className="text-gray-500 text-xs font-bold uppercase mb-3 ml-1">Mis Comidas Guardadas</h4>
                         <div className="space-y-2">
-                            {savedFoods.length === 0 ? (
-                                <div className="text-center py-10 border border-dashed border-gray-800 rounded-2xl">
-                                    <p className="text-gray-500 text-sm">No tienes comidas guardadas.</p>
-                                    <p className="text-xs text-gray-600">Crea una o escanea para empezar.</p>
-                                </div>
+                            {loading ? <div className="text-center py-10 text-zinc-600 font-bold uppercase text-xs animate-pulse">Cargando...</div> :
+                                results.length > 0 ? results.map((item, idx) => (
+                                    <SwipeableFoodItem key={item._id || idx} item={item} onAdd={handleAddFood} onDelete={handleDeleteSavedFood} />
+                                )) : <div className="text-center py-10 text-zinc-700 font-bold uppercase text-xs">{query ? "No encontrado" : "No tienes alimentos guardados"}</div>}
+                        </div>
+                    </div>
+                )}
+
+                {mode === 'ai' && (
+                    <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col">
+                        <div className="relative mt-2"><textarea placeholder="Describe tu comida o sube una foto..." className="w-full h-32 bg-zinc-900 border border-zinc-800 rounded-3xl p-5 text-white text-sm font-medium resize-none focus:border-blue-500/50 outline-none placeholder-zinc-600 leading-relaxed" value={aiInput} onChange={(e) => setAiInput(e.target.value)} /></div>
+                        <div>
+                            <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
+                            {!aiImagePreview ? (
+                                <button onClick={() => fileInputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-zinc-800 rounded-3xl flex flex-col items-center justify-center gap-2 hover:border-blue-500/50 hover:bg-zinc-900 transition-all group"><div className="bg-zinc-900 p-3 rounded-2xl group-hover:bg-black transition-colors"><Camera className="text-zinc-500 group-hover:text-blue-400" size={24} /></div><span className="text-xs font-bold text-zinc-500 uppercase tracking-wide group-hover:text-zinc-300">Tomar Foto / Subir Imagen</span></button>
                             ) : (
-                                savedFoods.map(food => (
-                                    <div key={food._id} onClick={() => { setSelectedFood(food); setView('result'); }} className="bg-gray-900 border border-gray-800 p-4 rounded-xl flex justify-between items-center cursor-pointer active:scale-95 transition-transform group hover:bg-gray-800">
-                                        <div className="flex items-center gap-4">
-                                            <span className="text-2xl">{food.icon || '🍽️'}</span>
-                                            <div><h4 className="font-bold text-white">{food.name}</h4><p className="text-xs text-gray-500">{food.calories} kcal</p></div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <button onClick={(e) => handleDeleteFood(food._id, e)} className="p-2 text-gray-600 hover:text-red-500"><Trash2 size={18} /></button>
-                                            <Plus className="text-blue-500" />
-                                        </div>
-                                    </div>
-                                ))
+                                <div className="relative rounded-3xl overflow-hidden border border-zinc-800 group"><img src={aiImagePreview} alt="Preview" className="w-full h-48 object-cover opacity-80 group-hover:opacity-100 transition-opacity" /><div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-4"><div className="flex justify-between items-center w-full"><span className="text-xs font-bold text-white flex items-center gap-2"><ImageIcon size={14} /> Imagen seleccionada</span><button onClick={clearImage} className="bg-red-500/20 text-red-400 p-2 rounded-xl hover:bg-red-500 hover:text-white transition-all backdrop-blur-md border border-red-500/30"><Trash2 size={18} /></button></div></div></div>
                             )}
                         </div>
-                    </>
-                )}
-
-                {/* VISTA 2: FORMULARIO MANUAL (AÑADIDA FIBRA) */}
-                {view === 'create' && (
-                    <div className="animate-in fade-in space-y-4">
-                        <h3 className="text-xl font-bold text-white mb-4">Nueva Comida</h3>
-
-                        <div>
-                            <label className="text-xs text-gray-500 font-bold uppercase ml-1">Nombre</label>
-                            <input type="text" placeholder="Ej: Arroz con Pollo" className="w-full bg-gray-800 text-white p-4 rounded-xl border border-gray-700 focus:border-blue-500 outline-none"
-                                value={newFoodData.name} onChange={e => setNewFoodData({ ...newFoodData, name: e.target.value })} autoFocus />
-                        </div>
-
-                        <div>
-                            <label className="text-xs text-gray-500 font-bold uppercase ml-1 flex items-center gap-1"><Flame size={12} /> Calorías</label>
-                            <input type="number" placeholder="0" className="w-full bg-gray-800 text-white p-4 rounded-xl border border-gray-700 focus:border-orange-500 outline-none"
-                                value={newFoodData.calories} onChange={e => setNewFoodData({ ...newFoodData, calories: e.target.value })} />
-                        </div>
-
-                        {/* GRID DE MACROS (4 COLUMNAS AHORA) */}
-                        <div className="grid grid-cols-4 gap-2">
-                            <div>
-                                <label className="text-[10px] text-blue-400 font-bold uppercase mb-1 block text-center">Prot</label>
-                                <input type="number" placeholder="0" className="w-full bg-gray-800 text-white p-2 rounded-xl border border-gray-700 text-center" value={newFoodData.protein} onChange={e => setNewFoodData({ ...newFoodData, protein: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className="text-[10px] text-yellow-400 font-bold uppercase mb-1 block text-center">Carb</label>
-                                <input type="number" placeholder="0" className="w-full bg-gray-800 text-white p-2 rounded-xl border border-gray-700 text-center" value={newFoodData.carbs} onChange={e => setNewFoodData({ ...newFoodData, carbs: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className="text-[10px] text-red-400 font-bold uppercase mb-1 block text-center">Grasa</label>
-                                <input type="number" placeholder="0" className="w-full bg-gray-800 text-white p-2 rounded-xl border border-gray-700 text-center" value={newFoodData.fat} onChange={e => setNewFoodData({ ...newFoodData, fat: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className="text-[10px] text-green-500 font-bold uppercase mb-1 block text-center">Fibra</label>
-                                <input type="number" placeholder="0" className="w-full bg-gray-800 text-white p-2 rounded-xl border border-gray-700 text-center" value={newFoodData.fiber} onChange={e => setNewFoodData({ ...newFoodData, fiber: e.target.value })} />
-                            </div>
-                        </div>
-
-                        <button onClick={handleCreateManual} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl mt-4 shadow-lg active:scale-95 transition-transform">CONTINUAR</button>
+                        <div className="pt-2"><button onClick={handleAiScanSubmit} disabled={aiLoading || (!aiInput.trim() && !aiImage)} className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-blue-900/20">{aiLoading ? <span className="animate-pulse flex items-center gap-2"><Sparkles size={16} /> Analizando...</span> : <>Procesar con IA <ArrowRight size={18} /></>}</button></div>
                     </div>
                 )}
 
-                {/* VISTA 3: PREVIEW FOTO */}
-                {view === 'preview' && (
-                    <div className="flex flex-col h-full animate-in fade-in">
-                        <div className="flex-1 bg-gray-800 rounded-2xl overflow-hidden relative mb-4 border border-gray-700">
-                            <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                        </div>
-                        <input type="text" placeholder="Detalles opcionales (ej: sin salsa)" value={userContext} onChange={(e) => setUserContext(e.target.value)} className="w-full bg-gray-900 border border-gray-800 text-white p-4 rounded-xl mb-4 focus:outline-none focus:border-blue-500" />
-                        <button onClick={handleAnalyze} className="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"><Sparkles size={20} /> ANALIZAR</button>
-                    </div>
-                )}
+                {(mode === 'manual' || mode === 'review') && (
+                    <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+                        {mode === 'review' && (
+                            <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-3xl mb-2">
+                                <p className="text-xs font-bold text-green-400 text-center">✅ ¡Análisis completado! Revisa los datos.</p>
+                            </div>
+                        )}
 
-                {/* VISTA 4: LOADING */}
-                {view === 'scan' && (
-                    <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
-                        <div className="w-24 h-24 bg-blue-600/20 rounded-full flex items-center justify-center mb-4 relative"><Loader2 className="animate-spin text-blue-500" size={48} /><Sparkles className="absolute top-0 right-0 text-yellow-400 animate-ping" /></div>
-                        <h3 className="text-xl font-bold text-white">Analizando...</h3>
-                    </div>
-                )}
+                        <div className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800">
+                            <label className="text-[10px] font-bold text-zinc-400 mb-1 block pl-2">Nombre</label>
+                            <input type="text" placeholder="Ej: Pollo con arroz" className="w-full bg-zinc-950 border border-zinc-800 text-white p-4 rounded-2xl outline-none focus:border-zinc-600 font-bold" value={manualForm.name} onChange={e => setManualForm({ ...manualForm, name: e.target.value })} />
 
-                {/* VISTA 5: RESULTADO FINAL (Edición antes de añadir) */}
-                {view === 'result' && selectedFood && (
-                    <div className="flex flex-col items-center mt-4 space-y-6 animate-in zoom-in-95">
-                        <div className="text-6xl animate-bounce">{selectedFood.icon}</div>
-                        <div className="text-center w-full px-6">
-                            <input type="text" value={selectedFood.name} onChange={(e) => setSelectedFood({ ...selectedFood, name: e.target.value })} className="bg-transparent text-2xl font-bold text-white text-center w-full border-b border-gray-700 focus:border-blue-500 outline-none pb-1" />
-                            <p className="text-gray-500 text-sm mt-2">{Math.round(selectedFood.calories * quantity)} Kcal</p>
+                            {mode === 'manual' && (
+                                <div className="mt-3 border-t border-zinc-800 pt-3"><button onClick={() => setShowAiHelper(!showAiHelper)} className="flex items-center gap-2 text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors"><Sparkles size={14} /> {showAiHelper ? 'Ocultar Asistente IA' : '🪄 Autocompletar con IA'}</button>{showAiHelper && (<div className="mt-3 space-y-2 animate-in slide-in-from-top-2"><textarea placeholder="Ej: 200g de pollo y 100g de arroz blanco cocido..." className="w-full bg-zinc-950 border border-purple-500/30 rounded-xl p-3 text-xs text-white focus:border-purple-500 outline-none min-h-[80px]" value={aiDescription} onChange={(e) => setAiDescription(e.target.value)} /><button onClick={handleAiAutofill} disabled={aiHelperLoading || !aiDescription.trim()} className="w-full bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-xl text-xs font-black uppercase tracking-wider flex justify-center gap-2 disabled:opacity-50">{aiHelperLoading ? <BrainCircuit className="animate-spin" size={14} /> : <BrainCircuit size={14} />} Calcular Macros</button></div>)}</div>
+                            )}
                         </div>
 
-                        <div className="flex items-center gap-6 bg-gray-800 p-2 rounded-2xl">
-                            <button onClick={() => setQuantity(q => Math.max(0.5, q - 0.5))} className="w-12 h-12 bg-gray-700 rounded-xl font-bold text-white text-xl">-</button>
-                            <div className="text-center w-24"><span className="text-4xl font-bold text-white">{quantity}</span><p className="text-xs text-gray-400">Ración</p></div>
-                            <button onClick={() => setQuantity(q => q + 0.5)} className="w-12 h-12 bg-blue-600 rounded-xl font-bold text-white text-xl">+</button>
+                        <div className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800 space-y-4">
+                            <div><label className="text-[10px] font-bold text-white mb-1 block pl-2 flex items-center gap-1">KCAL</label><input type="number" inputMode="decimal" placeholder="0" className="w-full bg-zinc-950 border border-zinc-800 text-white text-2xl p-4 rounded-2xl outline-none focus:border-orange-500/50 font-black text-center" value={manualForm.calories} onChange={e => setManualForm({ ...manualForm, calories: e.target.value })} /></div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className="text-[10px] font-bold text-zinc-400 mb-1 block pl-2 flex items-center gap-1"><Flame size={10} className="text-blue-500" /> Prot (g)</label><input type="number" inputMode="decimal" placeholder="0" className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 rounded-2xl outline-none focus:border-blue-500/50 font-bold text-center" value={manualForm.protein} onChange={e => setManualForm({ ...manualForm, protein: e.target.value })} /></div>
+                                <div><label className="text-[10px] font-bold text-zinc-400 mb-1 block pl-2 flex items-center gap-1"><Wheat size={10} className="text-yellow-500" /> Carb (g)</label><input type="number" inputMode="decimal" placeholder="0" className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 rounded-2xl outline-none focus:border-yellow-500/50 font-bold text-center" value={manualForm.carbs} onChange={e => setManualForm({ ...manualForm, carbs: e.target.value })} /></div>
+                                <div><label className="text-[10px] font-bold text-zinc-400 mb-1 block pl-2 flex items-center gap-1"><Droplet size={10} className="text-red-500" /> Grasa (g)</label><input type="number" inputMode="decimal" placeholder="0" className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 rounded-2xl outline-none focus:border-red-500/50 font-bold text-center" value={manualForm.fat} onChange={e => setManualForm({ ...manualForm, fat: e.target.value })} /></div>
+                                <div><label className="text-[10px] font-bold text-zinc-400 mb-1 block pl-2 flex items-center gap-1"><Leaf size={10} className="text-green-500" /> Fibra (g)</label><input type="number" inputMode="decimal" placeholder="0" className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 rounded-2xl outline-none focus:border-green-500/50 font-bold text-center" value={manualForm.fiber} onChange={e => setManualForm({ ...manualForm, fiber: e.target.value })} /></div>
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-4 gap-2 w-full">
-                            <div className="bg-gray-800 p-2 rounded-xl text-center border border-gray-700"><p className="text-blue-400 text-[10px] font-bold uppercase">Prot</p><p className="text-lg font-bold text-white">{Math.round(selectedFood.protein * quantity)}</p></div>
-                            <div className="bg-gray-800 p-2 rounded-xl text-center border border-gray-700"><p className="text-yellow-400 text-[10px] font-bold uppercase">Carb</p><p className="text-lg font-bold text-white">{Math.round(selectedFood.carbs * quantity)}</p></div>
-                            <div className="bg-gray-800 p-2 rounded-xl text-center border border-gray-700"><p className="text-red-400 text-[10px] font-bold uppercase">Grasa</p><p className="text-lg font-bold text-white">{Math.round(selectedFood.fat * quantity)}</p></div>
-                            <div className="bg-gray-800 p-2 rounded-xl text-center border border-gray-700"><p className="text-green-500 text-[10px] font-bold uppercase">Fibra</p><p className="text-lg font-bold text-white">{Math.round(selectedFood.fiber * quantity)}</p></div>
-                        </div>
-
-                        <div className="w-full space-y-3 pt-4">
-                            <button onClick={handleAdd} className="w-full bg-green-600 hover:bg-green-500 py-4 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"><Plus size={24} /> AÑADIR A HOY</button>
-                            {(selectedFood._id === 'ai_temp' || selectedFood._id === 'manual_temp') && (
-                                <button onClick={handleSaveToDb} className="w-full bg-gray-800 hover:bg-gray-700 py-4 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 border border-gray-700"><Save size={20} /> GUARDAR EN LISTA</button>
+                        <div className="pt-2 space-y-2">
+                            {mode === 'manual' ? (
+                                <button onClick={handleSaveToList} className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all shadow-lg shadow-white/10">Guardar Alimento</button>
+                            ) : (
+                                <div className="grid grid-cols-1 gap-3">
+                                    <button onClick={handleAddToMealNow} className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-white/10"><Plus size={18} strokeWidth={3} /> Añadir a Comida Hoy</button>
+                                    <button onClick={handleSaveToList} className="w-full bg-zinc-800 text-zinc-300 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-700 active:scale-95 transition-all flex items-center justify-center gap-2 border border-zinc-700"><Save size={16} /> Guardar en Mis Alimentos</button>
+                                </div>
                             )}
                         </div>
                     </div>
                 )}
-
             </div>
         </div>
     );

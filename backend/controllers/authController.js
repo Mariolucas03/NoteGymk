@@ -2,8 +2,8 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// Función segura para generar Token
 const generateToken = (id) => {
+    // Asegurarse de que JWT_SECRET exista para evitar errores fatales silenciosos
     if (!process.env.JWT_SECRET) {
         throw new Error('FATAL: JWT_SECRET no definido en variables de entorno');
     }
@@ -14,43 +14,47 @@ const generateToken = (id) => {
 // @route   POST /api/auth/register
 const registerUser = async (req, res) => {
     try {
+        // YA NO NECESITAMOS VALIDAR MANUALMENTE (Joi lo hizo por nosotros)
         const { username, email, password } = req.body;
 
-        if (!username || !email || !password) {
-            return res.status(400).json({ message: 'Rellena todos los campos' });
-        }
-
+        // 1. Validar duplicados (Lógica de negocio)
         const userExists = await User.findOne({ email });
         if (userExists) {
             return res.status(400).json({ message: 'El usuario ya existe' });
         }
 
+        const usernameExists = await User.findOne({ username });
+        if (usernameExists) {
+            return res.status(400).json({ message: 'El nombre de usuario ya está en uso' });
+        }
+
+        // 2. Hash Password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Creamos usuario con valores en la RAÍZ (Nueva estructura)
+        // 3. Crear Usuario (Estructura RPG inicializada)
         const user = await User.create({
             username,
             email,
             password: hashedPassword,
             coins: 0,
-            gameCoins: 500, // Bono de bienvenida para juegos
+            gameCoins: 500, // Bono bienvenida
             level: 1,
-            hp: 100,       // Salud en raíz
-            lives: 100,    // Compatibilidad
+            hp: 100,
+            lives: 100,
             streak: { current: 1, lastLogDate: new Date() }
         });
 
         if (user) {
-            // Convertimos a objeto para que Mongoose active los Virtuals (stats)
             const userResponse = user.toObject();
+            delete userResponse.password; // Seguridad: no devolver el hash
 
             res.status(201).json({
-                ...userResponse, // Envía todo: _id, username, coins, level, y el virtual 'stats'
+                ...userResponse,
                 token: generateToken(user._id)
             });
         } else {
-            res.status(400).json({ message: 'Datos inválidos' });
+            res.status(400).json({ message: 'Datos inválidos al crear usuario' });
         }
     } catch (error) {
         console.error(error);
@@ -62,13 +66,15 @@ const registerUser = async (req, res) => {
 // @route   POST /api/auth/login
 const loginUser = async (req, res) => {
     try {
+        // Joi ya validó que email y password vienen en el body
         const { email, password } = req.body;
-        const user = await User.findOne({ email });
+
+        // Buscamos usuario y solicitamos el password (que suele estar oculto en el modelo con select: false)
+        const user = await User.findOne({ email }).select('+password');
 
         if (user && (await bcrypt.compare(password, user.password))) {
-            // Convertimos a objeto para asegurar que el Frontend recibe 
-            // tanto los datos planos (root) como el virtual 'stats'
             const userResponse = user.toObject();
+            delete userResponse.password;
 
             res.json({
                 ...userResponse,

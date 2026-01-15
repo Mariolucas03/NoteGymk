@@ -24,6 +24,7 @@ const shopItemSchema = new mongoose.Schema({
         ]
     },
     icon: { type: String, default: '📦' },
+    sprite: { type: String }, // Aquí irá la TIRA DE IMÁGENES (Animación)
     description: { type: String, default: '' },
     // Para lógica de uso (ej: 'heal', 'xp', 'random_low')
     effectType: { type: String, default: 'cosmetic' },

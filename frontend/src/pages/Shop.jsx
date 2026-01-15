@@ -1,374 +1,416 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
-    Plus, X, ArrowLeft, RefreshCw, ArrowRightLeft, Gamepad2,
+    Plus, X, ArrowLeft, RefreshCw, ArrowRightLeft,
     Ticket, Heart, User, ScanFace, Palette, Package, PawPrint, Crown,
-    ShoppingBag, Backpack, Coins, Save
+    ShoppingBag, Backpack, Save, Loader2, Coins
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
+import ChestModal from '../components/common/ChestModal';
 
-// Categorías Visuales
 const CATEGORIES = [
-    { id: 'reward', label: 'PREMIOS', icon: <Ticket size={32} /> },
-    { id: 'consumable', label: 'POCIONES', icon: <Heart size={32} /> },
-    { id: 'avatar', label: 'AVATAR', icon: <User size={32} /> },
-    { id: 'frame', label: 'MARCOS', icon: <ScanFace size={32} /> },
-    { id: 'theme', label: 'TEMAS', icon: <Palette size={32} /> },
-    { id: 'chest', label: 'COFRES', icon: <Package size={32} /> },
-    { id: 'pet', label: 'MASCOTAS', icon: <PawPrint size={32} /> },
-    { id: 'title', label: 'TÍTULOS', icon: <Crown size={32} /> },
+    { id: 'reward', label: 'PREMIOS', icon: <Ticket size={24} /> },
+    { id: 'consumable', label: 'POCIONES', icon: <Heart size={24} /> },
+    { id: 'avatar', label: 'AVATAR', icon: <User size={24} /> },
+    { id: 'frame', label: 'MARCOS', icon: <ScanFace size={24} /> },
+    { id: 'theme', label: 'TEMAS', icon: <Palette size={24} /> },
+    { id: 'chest', label: 'COFRES', icon: <Package size={24} /> },
+    { id: 'pet', label: 'MASCOTAS', icon: <PawPrint size={24} /> },
+    { id: 'title', label: 'TÍTULOS', icon: <Crown size={24} /> },
 ];
 
 export default function Shop() {
-    const { user, setUser } = useOutletContext();
+    const { user, setUser, setIsUiHidden } = useOutletContext();
 
-    // --- ESTADOS ---
-    const [activeTab, setActiveTab] = useState('shop'); // 'shop' o 'inventory'
+    // ESTADOS
+    const [activeTab, setActiveTab] = useState('shop');
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [shopItems, setShopItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
 
-    // Exchange (Canje)
-    const [showExchange, setShowExchange] = useState(false);
-    const [exchangeAmount, setExchangeAmount] = useState(50);
+    // Cofres
+    const [rewardData, setRewardData] = useState(null);
+    const [isChestModalOpen, setIsChestModalOpen] = useState(false);
+    const [currentChestType, setCurrentChestType] = useState('wood');
+    const [currentChestImage, setCurrentChestImage] = useState(null);
 
-    // Item Selection & Creation
+    // Items y Creación
     const [selectedItem, setSelectedItem] = useState(null);
     const [showCreator, setShowCreator] = useState(false);
     const [newReward, setNewReward] = useState({ name: '', price: '' });
 
-    // --- CARGA INICIAL ---
-    useEffect(() => {
-        fetchShop();
-    }, []);
+    // Exchange
+    const [showExchange, setShowExchange] = useState(false);
+    const [exchangeAmount, setExchangeAmount] = useState(100);
+    const [isExchanging, setIsExchanging] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
-    // Resetear categoría al cambiar de pestaña
+    useEffect(() => { fetchShop(); }, []);
+    useEffect(() => { setSelectedCategory(null); }, [activeTab]);
+
+    // 🔥 SCROLL AL INICIO CUANDO CAMBIA LA CATEGORÍA O LA PESTAÑA
     useEffect(() => {
-        setSelectedCategory(null);
-    }, [activeTab]);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [selectedCategory, activeTab]);
+
+    // Auto-cierre del toast
+    useEffect(() => {
+        if (toast) {
+            const t = setTimeout(() => setToast(null), 2000);
+            return () => clearTimeout(t);
+        }
+    }, [toast]);
 
     const fetchShop = async () => {
         setLoading(true);
         try {
             const res = await api.get('/shop');
             setShopItems(res.data);
-        } catch (error) {
-            console.error("Error cargando tienda:", error);
-        } finally {
-            setLoading(false);
-        }
+        } catch (error) { console.error("Error tienda:", error); }
+        finally { setLoading(false); }
     };
 
     const showToast = (msg, type = 'success') => setToast({ message: msg, type });
 
-    // --- ACCIONES DE TIENDA ---
-
-    // 1. Limpiar Tienda (Admin)
     const handleResetShop = async () => {
-        if (!window.confirm("⚠️ ¿Vaciar toda la tienda? Esto borrará todos los productos.")) return;
+        if (!window.confirm("¿Vaciar toda la tienda?")) return;
         try {
             await api.post('/shop/seed');
             fetchShop();
-            showToast("Tienda vaciada correctamente", "info");
-        } catch (error) {
-            showToast("Error al vaciar tienda", "error");
-        }
+            showToast("Tienda reiniciada", "info");
+        } catch (error) { showToast("Error reset", "error"); }
     };
 
-    // 2. Canjear Fichas por Monedas
+    // LOGICA EXCHANGE
+    const EXCHANGE_RATE = 100;
+    const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
+    const maxExchangeable = Math.floor(currentFichas / EXCHANGE_RATE) * EXCHANGE_RATE;
+
     const handleExchange = async () => {
+        if (exchangeAmount > currentFichas) return showToast("Faltan fichas", "error");
+        if (exchangeAmount < 100) return showToast("Mínimo 100 fichas", "error");
+
+        setIsExchanging(true);
         try {
             const res = await api.post('/shop/exchange', { amountGameCoins: parseInt(exchangeAmount) });
             setUser(res.data.user);
             localStorage.setItem('user', JSON.stringify(res.data.user));
-            showToast(res.data.message);
+            showToast(`¡Canje Exitoso!`, "success");
             setShowExchange(false);
+            setExchangeAmount(100);
         } catch (error) {
-            showToast(error.response?.data?.message || "Error en canje", "error");
-        }
+            showToast(error.response?.data?.message || "Error canje", "error");
+        } finally { setIsExchanging(false); }
     };
 
-    // 3. Crear Recompensa Personalizada
-    const handleCreate = async (e) => {
-        e.preventDefault();
+    const handleCreate = async () => {
         if (!newReward.name || !newReward.price) return showToast("Faltan datos", "error");
-
         try {
-            const res = await api.post('/shop/create', {
-                name: newReward.name,
-                price: parseInt(newReward.price)
-            });
-            // Añadimos el nuevo item a la lista local para no tener que recargar todo
+            const res = await api.post('/shop/create', { name: newReward.name, price: parseInt(newReward.price) });
             setShopItems([res.data, ...shopItems]);
             setShowCreator(false);
             setNewReward({ name: '', price: '' });
-            showToast("Recompensa creada");
-        } catch (error) {
-            showToast("Error creando recompensa", "error");
-        }
+            showToast("Premio creado");
+        } catch (error) { showToast("Error creando", "error"); }
     };
 
-    // 4. Comprar Objeto
     const handleBuy = async () => {
-        if (!selectedItem) return;
+        if (!selectedItem || isProcessing) return;
+        setIsProcessing(true);
         try {
-            const res = await api.post('/shop/buy', { itemId: selectedItem._id });
-            setUser(res.data.user);
-            localStorage.setItem('user', JSON.stringify(res.data.user));
+            const endpoint = selectedItem.category === 'reward' ? '/shop/buy-reward' : '/shop/buy';
+            await api.post(endpoint, { itemId: selectedItem._id });
+
+            const resUser = await api.get('/auth/me');
+            setUser(resUser.data);
+
+            showToast("¡Comprado!", "success");
             setSelectedItem(null);
-            showToast(res.data.message);
         } catch (error) {
-            showToast(error.response?.data?.message || "Saldo insuficiente", "error");
-        }
+            showToast(error.response?.data?.message || "No tienes saldo", "error");
+        } finally { setIsProcessing(false); }
     };
 
-    // 5. Usar Objeto
     const handleUse = async () => {
-        if (!selectedItem) return;
+        if (!selectedItem || isProcessing) return;
+        setIsProcessing(true);
         try {
             const res = await api.post('/shop/use', { itemId: selectedItem._id });
             setUser(res.data.user);
             localStorage.setItem('user', JSON.stringify(res.data.user));
             setSelectedItem(null);
-            showToast(res.data.message); // Muestra "Disfruta tu premio..."
+
+            if (selectedItem.category === 'chest') {
+                setRewardData(res.data.reward);
+                setCurrentChestImage(selectedItem.icon);
+                if (selectedItem.name.includes('Legendario')) setCurrentChestType('legendary');
+                else if (selectedItem.name.includes('Dorado')) setCurrentChestType('gold');
+                else setCurrentChestType('wood');
+                setIsChestModalOpen(true);
+            } else {
+                showToast(res.data.message);
+            }
         } catch (error) {
             showToast(error.response?.data?.message || "Error al usar", "error");
-        }
+        } finally { setIsProcessing(false); }
     };
 
-    // --- FILTRADO DE ITEMS ---
     const getFilteredItems = () => {
         if (!selectedCategory) return [];
-
-        if (activeTab === 'shop') {
-            return shopItems.filter(item => item.category === selectedCategory);
-        } else {
-            return (user?.inventory || []).filter(slot => slot.item && slot.item.category === selectedCategory);
-        }
-    };
-
-    const getButtonText = (cat) => {
-        if (cat === 'chest') return 'ABRIR';
-        if (['reward', 'consumable'].includes(cat)) return 'USAR';
-        return 'EQUIPAR';
+        if (activeTab === 'shop') return shopItems.filter(item => item.category === selectedCategory);
+        return (user?.inventory || []).filter(slot => slot.item && slot.item.category === selectedCategory);
     };
 
     const itemsToShow = getFilteredItems();
 
     return (
-        <div className="pb-24 pt-4 px-4 min-h-screen animate-in fade-in select-none">
+        <div className="animate-in fade-in pb-24 relative min-h-screen select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* --- HEADER --- */}
-            <div className="bg-gray-900/80 p-4 rounded-3xl border border-gray-800 shadow-xl backdrop-blur-md sticky top-4 z-20 mb-6">
-                <div className="flex justify-between items-center mb-4">
-                    <div className="flex flex-col">
-                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Tu Saldo</span>
-                        <div className="flex items-center gap-4 mt-1">
-                            <div className="flex items-center gap-1.5 text-yellow-400">
-                                <Coins size={18} />
-                                <span className="text-xl font-black text-white">{user?.coins || 0}</span>
-                            </div>
-                            <div className="w-[1px] h-6 bg-gray-700"></div>
-                            <div className="flex items-center gap-1.5 text-purple-400">
-                                <Gamepad2 size={18} />
-                                <span className="text-xl font-black text-white">{user?.stats?.gameCoins || 0}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <button onClick={handleResetShop} className="bg-gray-800 p-2 rounded-xl text-gray-500 hover:text-red-400 transition-colors border border-gray-700">
-                        <RefreshCw size={18} />
-                    </button>
+            {/* HEADER PRO (NO STICKY) */}
+            <div className="flex justify-between items-end px-4 pt-6 pb-2 bg-black border-b border-zinc-900">
+                <div>
+                    <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">MERCADO</h1>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Gasta tu fortuna</p>
                 </div>
+                <div className="flex gap-2">
+                    <button onClick={handleResetShop} className="bg-zinc-900 p-2 rounded-full text-zinc-600 hover:text-red-500 border border-zinc-800 transition-colors"><RefreshCw size={18} /></button>
+                </div>
+            </div>
 
-                {/* Toggle Tienda / Mochila */}
-                <div className="flex bg-gray-950 p-1 rounded-2xl relative">
-                    <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gray-700 rounded-xl transition-all duration-300 ease-out ${activeTab === 'inventory' ? 'translate-x-[calc(100%+4px)]' : 'translate-x-0'}`} />
-                    <button onClick={() => setActiveTab('shop')} className={`flex-1 z-10 font-bold text-xs flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${activeTab === 'shop' ? 'text-white' : 'text-gray-500'}`}>
-                        <ShoppingBag size={16} /> TIENDA
+            {/* TABS FLOTANTES (AHORA SÍ SON STICKY) */}
+            <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md pt-4 pb-4 px-4 border-b border-zinc-900/50">
+                <div className="flex bg-zinc-900 p-1 rounded-2xl relative border border-zinc-800">
+                    <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-yellow-500 rounded-xl transition-all duration-300 ease-out shadow-lg ${activeTab === 'inventory' ? 'translate-x-[calc(100%+4px)]' : 'translate-x-0'}`} />
+                    <button onClick={() => setActiveTab('shop')} className={`flex-1 z-10 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${activeTab === 'shop' ? 'text-black' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                        <ShoppingBag size={14} /> Tienda
                     </button>
-                    <button onClick={() => setActiveTab('inventory')} className={`flex-1 z-10 font-bold text-xs flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${activeTab === 'inventory' ? 'text-white' : 'text-gray-500'}`}>
-                        <Backpack size={16} /> MOCHILA
+                    <button onClick={() => setActiveTab('inventory')} className={`flex-1 z-10 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${activeTab === 'inventory' ? 'text-black' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                        <Backpack size={14} /> Mochila
                     </button>
                 </div>
             </div>
 
-            {/* --- BARRA DE CANJE --- */}
-            {activeTab === 'shop' && !selectedCategory && (
-                <div className="mb-6 bg-gradient-to-r from-purple-900/40 to-blue-900/40 p-4 rounded-2xl border border-purple-500/30 flex items-center justify-between shadow-lg">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-purple-600 p-2 rounded-full text-white"><ArrowRightLeft size={20} /></div>
-                        <div>
-                            <p className="text-xs text-purple-200 font-bold uppercase">Casa de Cambio</p>
-                            <p className="text-[10px] text-gray-400">Fichas ➔ Monedas</p>
+            <div className="px-4 pt-6">
+
+                {/* WIDGET CASA DE CAMBIO (Solo en tienda principal) */}
+                {activeTab === 'shop' && !selectedCategory && (
+                    <div onClick={() => setShowExchange(true)} className="mb-6 bg-zinc-950 border border-purple-500/20 rounded-[32px] p-5 flex items-center justify-between cursor-pointer active:scale-95 transition-all hover:bg-zinc-900 group shadow-[0_0_20px_rgba(168,85,247,0.15)]">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors border border-purple-500/10">
+                                <ArrowRightLeft size={24} />
+                            </div>
+                            <div>
+                                <h3 className="text-white font-black text-lg italic uppercase tracking-tight">Casa de Cambio</h3>
+                                <p className="text-xs text-zinc-500 font-bold uppercase">100 Fichas ➔ 1 Moneda</p>
+                            </div>
                         </div>
                     </div>
-                    <button onClick={() => setShowExchange(true)} className="bg-purple-600 px-4 py-2 rounded-xl font-bold text-xs shadow-lg hover:bg-purple-500 transition-transform active:scale-95 text-white">
-                        CANJEAR
-                    </button>
-                </div>
-            )}
+                )}
 
-            {/* --- GRID DE CATEGORÍAS --- */}
-            {!selectedCategory ? (
-                <div className="grid grid-cols-2 gap-3 pb-8 animate-in fade-in slide-in-from-bottom-4">
-                    {CATEGORIES.map(cat => (
-                        <div key={cat.id} onClick={() => setSelectedCategory(cat.id)} className="aspect-[4/3] bg-gray-900 border border-gray-800 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 cursor-pointer group relative overflow-hidden shadow-lg">
-                            <div className="absolute inset-0 bg-gradient-to-br from-gray-800/0 to-gray-800/30 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="text-gray-500 group-hover:text-white group-hover:scale-110 transition-all duration-300 relative z-10">{cat.icon}</div>
-                            <span className="font-black text-[10px] text-gray-500 group-hover:text-white tracking-widest relative z-10 uppercase">{cat.label}</span>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                /* --- VISTA DE PRODUCTOS --- */
-                <div className="animate-in fade-in slide-in-from-right-8 pb-20">
-                    <div className="flex items-center gap-4 mb-6">
-                        <button onClick={() => setSelectedCategory(null)} className="bg-gray-800 p-2 rounded-full hover:bg-gray-700 active:scale-90 transition-transform text-white border border-gray-700"><ArrowLeft size={20} /></button>
-                        <h2 className="text-xl font-black uppercase tracking-wide text-white">{CATEGORIES.find(c => c.id === selectedCategory)?.label}</h2>
+                {/* GRID CATEGORÍAS */}
+                {!selectedCategory ? (
+                    <div className="grid grid-cols-2 gap-3 pb-8 animate-in fade-in slide-in-from-bottom-4">
+                        {CATEGORIES.map(cat => (
+                            <div key={cat.id} onClick={() => setSelectedCategory(cat.id)} className="aspect-[4/3] bg-zinc-950 border border-zinc-800 rounded-[28px] flex flex-col items-center justify-center gap-2 hover:border-yellow-500/30 transition-all active:scale-95 cursor-pointer group relative overflow-hidden shadow-lg">
+                                <div className="text-zinc-600 group-hover:text-yellow-500 group-hover:scale-110 transition-all duration-300 relative z-10">{cat.icon}</div>
+                                <span className="font-black text-[10px] text-zinc-500 group-hover:text-white tracking-widest relative z-10 uppercase">{cat.label}</span>
+                            </div>
+                        ))}
                     </div>
-
-                    {loading ? (
-                        <div className="text-center py-20 text-gray-500 animate-pulse">Cargando stock...</div>
-                    ) : itemsToShow.length === 0 && activeTab === 'inventory' ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-gray-600 opacity-50 border-2 border-dashed border-gray-800 rounded-3xl">
-                            <div className="mb-4"><Backpack size={48} /></div>
-                            <p className="text-sm font-bold uppercase tracking-wide">Mochila vacía</p>
+                ) : (
+                    <div className="animate-in fade-in slide-in-from-right-8 pb-20">
+                        {/* Header Categoría */}
+                        <div className="flex items-center gap-4 mb-6">
+                            <button onClick={() => setSelectedCategory(null)} className="bg-zinc-900 p-3 rounded-full hover:text-white active:scale-90 transition-transform text-zinc-400 border border-zinc-800"><ArrowLeft size={20} /></button>
+                            <h2 className="text-xl font-black uppercase tracking-tighter italic text-white">{CATEGORIES.find(c => c.id === selectedCategory)?.label}</h2>
                         </div>
-                    ) : (
-                        <div className="grid grid-cols-2 gap-3">
-                            {/* Botón Crear Propio (Solo en Premios de Tienda) */}
-                            {activeTab === 'shop' && selectedCategory === 'reward' && (
-                                <div onClick={() => setShowCreator(true)} className="aspect-square border-2 border-dashed border-gray-700 bg-transparent rounded-2xl flex flex-col items-center justify-center gap-2 hover:border-gray-500 hover:bg-gray-900 transition-all cursor-pointer group">
-                                    <div className="bg-gray-800 p-3 rounded-full text-gray-400 group-hover:text-white transition-colors"><Plus size={24} /></div>
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wide group-hover:text-white">Crear Nuevo</span>
-                                </div>
-                            )}
 
-                            {/* Lista de Items */}
-                            {itemsToShow.map(slotOrItem => {
-                                const item = activeTab === 'shop' ? slotOrItem : slotOrItem.item;
-                                return (
-                                    <div key={item._id} onClick={() => setSelectedItem(item)} className="bg-gray-900 border border-gray-800 rounded-2xl p-4 flex flex-col items-center justify-between relative hover:border-gray-600 transition-all cursor-pointer group min-h-[160px] shadow-lg">
-                                        <div className="text-4xl mt-2 mb-2 group-hover:scale-110 transition-transform duration-300 filter drop-shadow-lg">{item.icon || '📦'}</div>
-                                        <div className="text-center w-full">
-                                            <h3 className="text-xs font-bold text-white truncate w-full mb-1 uppercase">{item.name}</h3>
-                                            <p className="text-[9px] text-gray-500 line-clamp-2 leading-tight px-1 mb-2 h-6 overflow-hidden">{item.description}</p>
-                                            {activeTab === 'shop' && (
-                                                <div className="text-[10px] font-mono text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded inline-block border border-yellow-500/20 font-bold">
-                                                    {item.price} $
-                                                </div>
-                                            )}
-                                            {activeTab === 'inventory' && (
-                                                <div className="text-[9px] font-bold text-gray-400 bg-gray-800 px-2 py-0.5 rounded inline-block">
-                                                    x{slotOrItem.quantity}
-                                                </div>
-                                            )}
-                                        </div>
+                        {loading ? <div className="text-center py-20 text-zinc-500 animate-pulse font-bold text-xs uppercase">Cargando mercancía...</div> : (
+                            <div className="grid grid-cols-2 gap-3">
+                                {/* Botón Crear (Solo en Premios y Tienda) */}
+                                {activeTab === 'shop' && selectedCategory === 'reward' && (
+                                    <div onClick={() => setShowCreator(true)} className="aspect-square border-2 border-dashed border-zinc-800 rounded-3xl flex flex-col items-center justify-center gap-2 hover:bg-zinc-900 hover:border-yellow-500/50 transition-all cursor-pointer group bg-black/20">
+                                        <div className="bg-zinc-800 p-3 rounded-full text-zinc-500 group-hover:text-yellow-500 transition-colors"><Plus size={24} /></div>
+                                        <span className="text-[10px] font-black text-zinc-500 uppercase group-hover:text-yellow-500">Crear Nuevo</span>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            )}
+                                )}
 
-            {/* --- MODALES --- */}
+                                {/* LISTA DE ITEMS */}
+                                {itemsToShow.map(slotOrItem => {
+                                    const item = activeTab === 'shop' ? slotOrItem : slotOrItem.item;
+                                    const isOwned = user?.inventory?.some(s => s.item && s.item._id === item._id);
+                                    const isUnique = ['avatar', 'frame', 'theme', 'title', 'pet'].includes(item.category);
+                                    const purchased = activeTab === 'shop' && isOwned && isUnique;
+                                    const isReward = item.category === 'reward';
 
-            {/* Modal Detalle / Compra / Uso */}
+                                    const iconPath = isReward ? "/assets/icons/moneda.png" : "/assets/icons/ficha.png";
+
+                                    return (
+                                        <div
+                                            key={item._id}
+                                            onClick={() => { if (!purchased) setSelectedItem(item); }}
+                                            className={`
+                                                relative bg-zinc-950 border border-zinc-800 rounded-3xl p-4 flex flex-col items-center justify-between transition-all shadow-md min-h-[160px]
+                                                ${purchased ? 'opacity-50 grayscale cursor-default' : 'hover:border-yellow-500/30 cursor-pointer active:scale-95'}
+                                            `}
+                                        >
+                                            <div className="h-14 w-14 mb-2 flex items-center justify-center">
+                                                {(item.icon?.startsWith('/') || item.icon?.startsWith('http')) ?
+                                                    <img src={item.icon} className="w-full h-full object-contain filter drop-shadow-lg" />
+                                                    : <div className="text-4xl">{item.icon}</div>}
+                                            </div>
+
+                                            <div className="text-center w-full">
+                                                <h3 className="text-[10px] font-black text-white truncate w-full mb-3 uppercase tracking-wide">{item.name}</h3>
+
+                                                {purchased ? (
+                                                    <div className="text-[8px] font-black text-green-500 uppercase tracking-widest bg-green-900/10 px-2 py-1 rounded border border-green-500/20">ADQUIRIDO</div>
+                                                ) : (
+                                                    <>
+                                                        {activeTab === 'shop' && (
+                                                            <div className={`text-[10px] font-black px-3 py-1.5 rounded-lg inline-flex items-center justify-center gap-1.5 border ${isReward ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' : 'text-purple-400 bg-purple-500/10 border-purple-500/20'}`}>
+                                                                {item.price}
+                                                                <img src={iconPath} className="w-5 h-5 object-contain mt-1" />
+                                                            </div>
+                                                        )}
+                                                        {activeTab === 'inventory' && (
+                                                            <div className="text-[9px] font-black text-zinc-500 bg-zinc-900 px-2 py-1 rounded inline-block uppercase border border-zinc-800">
+                                                                {isUnique ? 'EN PROPIEDAD' : `X ${slotOrItem.quantity}`}
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* MODALES FULL SCREEN */}
+
+            {/* 1. Detalle / Compra */}
             {selectedItem && (
-                <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in zoom-in-95">
-                    <div className="w-full max-w-sm bg-gray-900 border border-gray-700 rounded-3xl p-8 relative flex flex-col items-center text-center shadow-2xl">
-                        <button onClick={() => setSelectedItem(null)} className="absolute top-4 right-4 text-gray-500 hover:text-white bg-gray-800 p-2 rounded-full"><X size={20} /></button>
+                <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
+                    <div className="w-full max-w-sm bg-zinc-950 border border-zinc-800 rounded-[32px] p-8 relative flex flex-col items-center text-center shadow-2xl">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10"></div>
 
-                        <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mb-6 shadow-inner border-4 border-gray-700">
-                            <div className="text-6xl animate-bounce-slow filter drop-shadow-lg">{selectedItem.icon}</div>
+                        <button onClick={() => setSelectedItem(null)} className="absolute top-4 right-4 text-zinc-500 hover:text-white bg-zinc-900 p-2 rounded-full transition-colors border border-zinc-800"><X size={20} /></button>
+
+                        <div className="w-28 h-28 bg-zinc-900 rounded-3xl flex items-center justify-center mb-6 shadow-inner border border-zinc-800 overflow-hidden relative">
+                            {(selectedItem.icon?.startsWith('/') || selectedItem.icon?.startsWith('http')) ? <img src={selectedItem.icon} className="w-full h-full object-cover" /> : <div className="text-6xl animate-bounce-slow">{selectedItem.icon}</div>}
                         </div>
 
-                        <h2 className="text-2xl font-black uppercase text-white mb-2 leading-tight">{selectedItem.name}</h2>
-                        <p className="text-sm text-gray-400 mb-6">{selectedItem.description || "Recompensa personalizada"}</p>
+                        <h2 className="text-xl font-black uppercase text-white mb-2 leading-tight italic tracking-wide">{selectedItem.name}</h2>
+                        <p className="text-xs font-bold text-zinc-500 mb-8 uppercase tracking-widest px-4">
+                            {selectedItem.description || "Sin descripción disponible"}
+                        </p>
 
                         <button
                             onClick={activeTab === 'shop' ? handleBuy : handleUse}
-                            className={`w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm shadow-lg transition-transform active:scale-95 ${activeTab === 'shop' ? 'bg-yellow-500 text-black hover:bg-yellow-400' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                            disabled={isProcessing}
+                            className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl transition-all active:scale-95 border-b-4 flex items-center justify-center gap-2
+                                ${activeTab === 'shop'
+                                    ? (selectedItem.category === 'reward' ? 'bg-yellow-500 text-black hover:bg-yellow-400 border-yellow-700' : 'bg-purple-600 text-white hover:bg-purple-500 border-purple-800')
+                                    : 'bg-green-600 text-white hover:bg-green-500 border-green-800'
+                                }`}
                         >
-                            {activeTab === 'shop' ? `COMPRAR • ${selectedItem.price}` : getButtonText(selectedItem.category)}
+                            {isProcessing ? <Loader2 className="animate-spin" /> : (
+                                activeTab === 'shop' ? (
+                                    <>
+                                        COMPRAR • {selectedItem.price}
+                                        <img src={selectedItem.category === 'reward' ? "/assets/icons/moneda.png" : "/assets/icons/ficha.png"} className="w-5 h-5 object-contain mt-0.5" />
+                                    </>
+                                ) : (selectedItem.category === 'chest' ? 'ABRIR COFRE' : 'USAR ITEM')
+                            )}
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* Modal Crear Recompensa */}
+            {/* 2. Crear Premio */}
             {showCreator && (
-                <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in zoom-in-95">
-                    <div className="w-full max-w-sm bg-gray-900 border border-gray-700 rounded-3xl p-6 relative shadow-2xl">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-white flex items-center gap-2"><Ticket className="text-yellow-500" /> Nuevo Premio</h3>
-                            <button onClick={() => setShowCreator(false)} className="text-gray-500 hover:text-white bg-gray-800 p-2 rounded-full"><X size={20} /></button>
+                <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
+                    <div className="w-full max-w-sm bg-zinc-950 border border-zinc-800 rounded-[32px] p-6 relative shadow-2xl">
+                        <div className="flex justify-between items-center mb-6 relative z-10">
+                            <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Nuevo <span className="text-yellow-500">Premio</span></h3>
+                            <button onClick={() => setShowCreator(false)} className="text-zinc-500 hover:text-white bg-zinc-900 p-2 rounded-full border border-zinc-800"><X size={20} /></button>
                         </div>
 
-                        <form onSubmit={handleCreate} className="space-y-4">
+                        <div className="space-y-4 relative z-10">
                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">Nombre</label>
-                                <input type="text" placeholder="Ej: 1h Videojuegos" autoFocus value={newReward.name} onChange={e => setNewReward({ ...newReward, name: e.target.value })} className="w-full bg-gray-950 border border-gray-800 rounded-xl p-3 text-white focus:border-yellow-500 outline-none mt-1" />
+                                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 block mb-2 tracking-widest">Nombre</label>
+                                <input type="text" placeholder="Ej: 1h Videojuegos" autoFocus value={newReward.name} onChange={e => setNewReward({ ...newReward, name: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-white font-bold text-sm outline-none focus:ring-0 focus:border-yellow-500/50 transition-colors placeholder:text-zinc-700" />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">Precio (Monedas)</label>
-                                <input type="number" placeholder="Ej: 100" value={newReward.price} onChange={e => setNewReward({ ...newReward, price: e.target.value })} className="w-full bg-gray-950 border border-gray-800 rounded-xl p-3 text-white focus:border-yellow-500 outline-none mt-1" />
+                                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 block mb-2 tracking-widest">Precio</label>
+                                <input type="number" placeholder="Ej: 100" value={newReward.price} onChange={e => setNewReward({ ...newReward, price: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-white font-bold text-sm outline-none focus:ring-0 focus:border-yellow-500/50 transition-colors placeholder:text-zinc-700" />
                             </div>
-                            <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-3 rounded-xl mt-2 transition-all active:scale-95 flex items-center justify-center gap-2">
-                                <Save size={18} /> CREAR PREMIO
+                            <button onClick={handleCreate} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mt-4 transition-all active:scale-95 flex items-center justify-center gap-2 border-b-4 border-yellow-700 uppercase tracking-widest text-xs">
+                                <Save size={16} /> CREAR PREMIO
                             </button>
-                        </form>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Modal Canje */}
+            {/* 3. Modal Canje */}
             {showExchange && (
-                <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in zoom-in-95">
-                    <div className="bg-gray-900 w-full max-w-sm rounded-3xl border border-gray-700 p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold text-white flex items-center gap-2"><ArrowRightLeft className="text-purple-500" /> Casa de Cambio</h3>
-                            <button onClick={() => setShowExchange(false)} className="text-gray-500 hover:text-white"><X size={20} /></button>
+                <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in h-screen w-screen">
+                    <div className="bg-zinc-950 w-full max-w-sm rounded-[32px] border border-zinc-800 p-6 shadow-2xl relative">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10"></div>
+
+                        <div className="flex justify-between items-center mb-8 relative z-10">
+                            <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Casa de <span className="text-yellow-500">Cambio</span></h3>
+                            <button onClick={() => setShowExchange(false)} className="text-zinc-500 hover:text-white bg-zinc-900 p-2 rounded-full border border-zinc-800"><X size={20} /></button>
                         </div>
 
-                        <div className="flex items-center justify-between mb-6 bg-black/40 p-4 rounded-2xl border border-gray-800">
-                            <div className="text-center">
-                                <span className="block text-2xl font-black text-purple-400">{exchangeAmount}</span>
-                                <span className="text-[10px] text-gray-500 uppercase font-bold">Fichas</span>
+                        <div className="flex items-center justify-between mb-8 bg-zinc-900/50 p-4 rounded-3xl border border-zinc-800 relative z-10">
+                            <div className="text-center flex flex-col items-center">
+                                <span className="block text-2xl font-black text-purple-400 leading-none mb-2">{exchangeAmount}</span>
+                                <span className="text-[9px] text-zinc-500 uppercase font-black tracking-widest flex items-center gap-1">
+                                    <img src="/assets/icons/ficha.png" className="w-6 h-6 object-contain mt-1" /> Fichas
+                                </span>
                             </div>
-                            <div className="text-gray-600"><ArrowRightLeft size={24} /></div>
-                            <div className="text-center">
-                                <span className="block text-2xl font-black text-yellow-400">{Math.floor(exchangeAmount / 10)}</span>
-                                <span className="text-[10px] text-gray-500 uppercase font-bold">Monedas</span>
+                            <div className="text-zinc-600"><ArrowRightLeft size={20} /></div>
+                            <div className="text-center flex flex-col items-center">
+                                <span className="block text-2xl font-black text-yellow-500 leading-none mb-2">{Math.floor(exchangeAmount / 100)}</span>
+                                <span className="text-[9px] text-zinc-500 uppercase font-black tracking-widest flex items-center gap-1">
+                                    <img src="/assets/icons/moneda.png" className="w-6 h-6 object-contain mt-1" /> Monedas
+                                </span>
                             </div>
                         </div>
 
-                        <div className="mb-6">
-                            <label className="text-xs text-gray-500 uppercase font-bold mb-2 block ml-1">Cantidad a cambiar (Mín 10)</label>
+                        <div className="mb-6 relative z-10">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase mb-2 block ml-1 tracking-widest">Cantidad a cambiar</label>
                             <input
                                 type="number"
-                                step="10"
-                                min="10"
+                                step="100"
+                                min="100"
                                 value={exchangeAmount}
                                 onChange={e => setExchangeAmount(Math.max(0, parseInt(e.target.value) || 0))}
-                                className="w-full bg-gray-950 border border-gray-800 rounded-xl p-4 text-white font-bold text-center text-xl focus:border-purple-500 outline-none transition-colors"
+                                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-white font-black text-center text-xl outline-none focus:ring-0 focus:border-yellow-500/50 transition-colors"
                             />
-                            <div className="flex justify-between mt-2 gap-2">
-                                <button onClick={() => setExchangeAmount(10)} className="text-xs bg-gray-800 px-3 py-1.5 rounded-lg text-gray-400 hover:text-white border border-gray-700">Mínimo</button>
-                                <button onClick={() => setExchangeAmount(user?.stats?.gameCoins || 0)} className="text-xs bg-purple-900/30 px-3 py-1.5 rounded-lg text-purple-400 hover:text-purple-300 border border-purple-500/30">Máximo</button>
+                            <div className="flex justify-between mt-3 gap-2">
+                                <button onClick={() => setExchangeAmount(100)} className="text-[9px] font-black bg-zinc-900 px-4 py-2 rounded-xl text-zinc-500 hover:text-white border border-zinc-800 uppercase tracking-wide flex-1">Mínimo</button>
+                                <button onClick={() => setExchangeAmount(maxExchangeable)} className="text-[9px] font-black bg-zinc-900 px-4 py-2 rounded-xl text-blue-400 hover:text-blue-300 border border-zinc-800 uppercase tracking-wide flex-1">Máximo</button>
                             </div>
                         </div>
 
-                        <button onClick={handleExchange} className="w-full py-4 bg-purple-600 text-white rounded-xl font-black shadow-lg hover:bg-purple-500 active:scale-95 transition-all">
-                            CONFIRMAR CANJE
+                        <button onClick={handleExchange} disabled={isExchanging} className="w-full py-4 bg-yellow-500 text-black rounded-2xl font-black shadow-lg hover:bg-yellow-400 active:scale-95 transition-all flex justify-center items-center gap-2 border-b-4 border-yellow-700 uppercase tracking-widest text-xs relative z-10">
+                            {isExchanging ? <Loader2 className="animate-spin" /> : 'CONFIRMAR CANJE'}
                         </button>
                     </div>
                 </div>
             )}
+
+            <ChestModal isOpen={isChestModalOpen} onClose={() => setIsChestModalOpen(false)} reward={rewardData} chestType={currentChestType} chestImage={currentChestImage} />
         </div>
     );
 }

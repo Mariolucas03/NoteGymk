@@ -5,6 +5,7 @@ const {
     getRoutines,
     createRoutine,
     deleteRoutine,
+    updateRoutine,
     getAllExercises,
     createCustomExercise,
     saveWorkoutLog,
@@ -20,9 +21,14 @@ const {
 
 const protect = require('../middleware/authMiddleware');
 
+// 🔥 IMPORTACIONES DE SEGURIDAD NUEVAS
+const validate = require('../middleware/validate');
+const { workoutLogSchema } = require('../schemas/gymSchemas');
+
 // Rutinas
 router.get('/routines', protect, getRoutines);
 router.post('/routines', protect, createRoutine);
+router.put('/routines/:id', protect, updateRoutine);
 router.delete('/routines/:id', protect, deleteRoutine);
 
 // Ejercicios
@@ -30,7 +36,8 @@ router.get('/exercises', protect, getAllExercises);
 router.post('/exercises', protect, createCustomExercise);
 
 // Logs / Registros
-router.post('/log', protect, saveWorkoutLog);
+// 🛡️ AQUÍ APLICAMOS LA VALIDACIÓN JOI ANTES DEL CONTROLADOR
+router.post('/log', protect, validate(workoutLogSchema), saveWorkoutLog);
 router.post('/sport', protect, saveSportLog);
 
 // Utilidades
@@ -42,7 +49,6 @@ router.post('/seed-history', protect, seedFakeHistory);
 router.get('/muscle-progress', protect, getMuscleProgress);
 router.post('/history-stats', protect, getRoutineHistory);
 router.get('/body-status', protect, getBodyStatus);
-// 👇👇👇 ESTA ES LA RUTA QUE FALTABA (SOLUCIONA EL ERROR 404) 👇👇👇
 router.get('/exercise-history', protect, getExerciseHistory);
 
 module.exports = router;

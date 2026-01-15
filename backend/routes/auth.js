@@ -2,7 +2,12 @@ const express = require('express');
 const router = express.Router();
 const { registerUser, loginUser } = require('../controllers/authController');
 
-router.post('/register', registerUser);
-router.post('/login', loginUser);
+// Importamos validación
+const validate = require('../middleware/validate');
+const { registerSchema, loginSchema } = require('../schemas/authSchemas');
+
+// Inyectamos el middleware antes del controlador
+router.post('/register', validate(registerSchema), registerUser);
+router.post('/login', validate(loginSchema), loginUser);
 
 module.exports = router;

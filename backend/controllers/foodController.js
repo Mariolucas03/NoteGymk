@@ -3,11 +3,7 @@ const NutritionLog = require('../models/NutritionLog');
 const DailyLog = require('../models/DailyLog');
 const fs = require('fs');
 
-// --- 1. CONFIGURACIÓN GEMINI (PARA TEXTO/CHAT) ---
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// --- 2. CONFIGURACIÓN OPENROUTER (PARA IMÁGENES/PLAN B) ---
+// --- CONFIGURACIÓN OPENROUTER ---
 const OpenAI = require("openai");
 const openrouter = new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
@@ -21,154 +17,135 @@ const openrouter = new OpenAI({
 const getTodayStr = () => new Date().toISOString().split('T')[0];
 
 // ==========================================
-// 🧠 PLAN B: CÁLCULO MATEMÁTICO LOCAL
+// 🧠 CÁLCULO MATEMÁTICO LOCAL (PLAN Z)
 // ==========================================
 const calculateLocalMacros = (text) => {
-    console.log("⚠️ Usando Plan B (Matemático)...");
-
-    const ageMatch = text.match(/(\d+)\s*(?:años|a|y)/i) || text.match(/edad\s*[:]?\s*(\d+)/i);
-    const weightMatch = text.match(/(\d+)\s*(?:kg|kilos)/i) || text.match(/peso\s*[:]?\s*(\d+)/i);
-    const heightMatch = text.match(/(\d+)\s*(?:cm|centimetros)/i) || text.match(/altura\s*[:]?\s*(\d+)/i);
-    const genderMatch = text.match(/(hombre|mujer|masculino|femenino)/i);
-    const goalMatch = text.match(/(perder|bajar|definir|ganar|subir|masa|mantener)/i);
-
-    if (!ageMatch || !weightMatch || !heightMatch) return null;
-
-    const age = parseInt(ageMatch[1]);
-    const weight = parseInt(weightMatch[1]);
-    const height = parseInt(heightMatch[1]);
-    const isMale = genderMatch && (genderMatch[1].toLowerCase().startsWith('h') || genderMatch[1].toLowerCase().startsWith('m'));
-    const goal = goalMatch ? goalMatch[1].toLowerCase() : 'mantener';
-
-    let bmr;
-    if (isMale) {
-        bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
-    } else {
-        bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
-    }
-
-    let activity = 1.375;
-    if (text.includes('sedentario')) activity = 1.2;
-    if (text.includes('ligero')) activity = 1.375;
-    if (text.includes('moderado')) activity = 1.55;
-    if (text.includes('intenso')) activity = 1.725;
-
-    let tdee = Math.round(bmr * activity);
-
-    if (goal.includes('perder') || goal.includes('bajar')) tdee -= 400;
-    else if (goal.includes('ganar') || goal.includes('subir')) tdee += 300;
-
-    const protein = Math.round((tdee * 0.3) / 4);
-    const carbs = Math.round((tdee * 0.4) / 4);
-    const fat = Math.round((tdee * 0.3) / 9);
-    const fiber = Math.round((tdee / 1000) * 14);
-
-    return {
-        done: true,
-        calories: tdee,
-        protein,
-        carbs,
-        fat,
-        fiber,
-        message: "✅ Cálculo realizado (Modo Matemático)."
-    };
+    console.log("⚠️ IAs caídas. Usando Plan Z (Matemático)...");
+    return null;
 };
 
 // ==========================================
-// 🤖 CALCULADORA CON GEMINI API (TEXTO)
+// 🤖 CALCULADORA NUTRICIONISTA (CHAT PERFIL)
 // ==========================================
 const chatMacroCalculator = async (req, res) => {
     const { history } = req.body;
-    const lastUserMessage = history[history.length - 1].content;
 
-    try {
-        // Usamos Gemini Flash OFICIAL para texto (rápido y fiable)
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const TEXT_MODELS_CASCADE = [
+        "deepseek/deepseek-r1-distill-llama-70b:free",
+        "google/gemini-2.0-flash-exp:free",
+        "qwen/qwen-2.5-vl-72b-instruct:free",
+        "meta-llama/llama-3.3-70b-instruct:free"
+    ];
 
-        const prompt = `
-            Actúa como un nutricionista experto y calculadora lógica.
-            Analiza el siguiente texto del usuario: "${lastUserMessage}".
+    const SYSTEM_PROMPT = `
+    Actúa como un nutricionista experto. Extrae edad, peso, altura, género y objetivo.
+    REGLAS:
+    1. Si tienes TODOS los datos: Calcula TDEE, ajusta según objetivo, distribuye macros (30/40/30).
+       Devuelve JSON: { "type": "final", "data": { "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "message": "Resumen..." } }
+    2. Si FALTA dato: Devuelve JSON: { "type": "question", "message": "Pregunta qué falta..." }
+    FORMATO JSON PURO SIN MARKDOWN.
+    `;
 
-            TU OBJETIVO: Extraer edad, peso, altura, género, actividad y objetivo.
-            
-            REGLAS:
-            1. Si tienes TODOS los datos (Edad, Peso, Altura, Género):
-               - Calcula el TDEE (Harris-Benedict).
-               - Aplica ajuste: Déficit (-400kcal), Superávit (+300kcal) o Mantenimiento (0).
-               - Distribuye macros: 30% Proteína, 40% Carbos, 30% Grasa.
-               - Fibra: 14g por cada 1000kcal.
-               - Devuelve JSON con "done": true.
-            
-            2. Si FALTA algún dato:
-               - Devuelve JSON con "done": false.
-               - En "message" pregunta educadamente SOLO por el dato que falta.
+    const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...history];
 
-            FORMATO DE RESPUESTA JSON ESPERADO:
-            {
-                "done": boolean,
-                "calories": number (solo si done=true),
-                "protein": number (solo si done=true),
-                "carbs": number (solo si done=true),
-                "fat": number (solo si done=true),
-                "fiber": number (solo si done=true),
-                "message": string (Respuesta al usuario)
-            }
-        `;
-
-        console.log("🤖 Consultando a Google Gemini (Texto)...");
-
-        // 🔥 CORRECCIÓN APLICADA: FORZAR JSON 🔥
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: {
-                responseMimeType: "application/json",
-            }
-        });
-
-        const response = await result.response;
-        const jsonText = response.text();
-        const data = JSON.parse(jsonText);
-
-        if (data.done) {
-            console.log("✅ Gemini calculó los macros correctamente.");
-            return res.json({ type: 'final', data: data });
-        } else {
-            console.log("❓ Gemini pide más datos.");
-            return res.json({ type: 'question', message: data.message });
-        }
-
-    } catch (error) {
-        console.error("❌ Error con Gemini API (Texto):", error.message);
-
-        // --- FALLBACK A PLAN B (Cálculo local) ---
-        const localResult = calculateLocalMacros(lastUserMessage);
-
-        if (localResult) {
-            return res.json({ type: 'final', data: localResult });
-        } else {
-            return res.json({
-                type: 'question',
-                message: "Hubo un error de conexión y no entendí tus datos para el cálculo manual. Por favor, escribe: EDAD, PESO, ALTURA y GÉNERO todo junto."
+    for (const model of TEXT_MODELS_CASCADE) {
+        try {
+            const completion = await openrouter.chat.completions.create({
+                model: model,
+                messages: messages,
+                temperature: 0.5,
+                response_format: { type: "json_object" }
             });
+            let content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+            const jsonResponse = JSON.parse(content);
+            return res.json(jsonResponse);
+        } catch (error) {
+            console.error(`❌ Falló ${model}: ${error.message}`);
         }
     }
+    return res.json({ type: 'question', message: "No pude procesar los datos." });
 };
 
 // ==========================================
-// 📷 ANÁLISIS DE IMAGEN (VERSION OPENROUTER CASCADA)
+// 🪄 ANALIZAR TEXTO DE COMIDA (CASCADA IA)
+// ==========================================
+const analyzeFoodText = async (req, res) => {
+    const { text } = req.body;
+
+    const TEXT_MODELS_CASCADE = [
+        "deepseek/deepseek-r1-distill-llama-70b:free",
+        "google/gemini-2.0-flash-exp:free",
+        "qwen/qwen-2.5-vl-72b-instruct:free",
+        "mistralai/mistral-7b-instruct:free"
+    ];
+
+    const SYSTEM_PROMPT = `
+    Eres un experto nutricionista y analista de alimentos.
+    Tu tarea es analizar el texto del usuario: "${text}".
+    
+    Calcula o estima las calorías y macronutrientes (Proteína, Carbohidratos, Grasa, Fibra).
+    Si el usuario no especifica cantidad, asume una ración estándar lógica.
+    
+    ⚠️ REGLAS CRÍTICAS:
+    1. Responde SOLO con un objeto JSON válido. Nada de texto extra.
+    2. Usa números enteros (sin decimales).
+    3. Formato exacto:
+    {
+        "calories": 0,
+        "protein": 0,
+        "carbs": 0,
+        "fat": 0,
+        "fiber": 0
+    }
+    `;
+
+    for (const model of TEXT_MODELS_CASCADE) {
+        try {
+            console.log(`🤖 Analizando comida con: ${model}...`);
+
+            const completion = await openrouter.chat.completions.create({
+                model: model,
+                messages: [
+                    { role: "system", content: SYSTEM_PROMPT }
+                ],
+                temperature: 0.1,
+                response_format: { type: "json_object" }
+            });
+
+            let content = completion.choices[0].message.content;
+            content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+            const firstBrace = content.indexOf('{');
+            const lastBrace = content.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1) {
+                content = content.substring(firstBrace, lastBrace + 1);
+            }
+
+            const jsonResponse = JSON.parse(content);
+            return res.json({ type: 'success', data: jsonResponse });
+
+        } catch (error) {
+            console.error(`❌ Falló ${model}: ${error.message}. Probando siguiente...`);
+        }
+    }
+
+    return res.status(500).json({ message: "No se pudo calcular. Intenta ponerlo manual." });
+};
+
+// ==========================================
+// 📷 ANÁLISIS DE IMAGEN (MEGA CASCADA)
 // ==========================================
 const analyzeImage = async (req, res) => {
+    // 🔥 LISTA MASIVA DE MODELOS DE VISIÓN (Prioridad: Calidad -> Velocidad)
+    // Si uno falla, pasa al siguiente. Es casi imposible que fallen todos.
     const VISION_MODELS = [
-        "google/gemini-flash-1.5-8b-exp:free",
-        "google/gemini-2.0-flash-exp:free",
-        "meta-llama/llama-3.2-11b-vision-instruct:free",
-        "google/gemini-flash-1.5-exp:free",
-        "qwen/qwen-2-vl-7b-instruct:free",
-        "google/gemini-pro-1.5-exp:free",
-        "meta-llama/llama-3.2-90b-vision-instruct:free",
-        "qwen/qwen-2-vl-72b-instruct:free",
-        "openrouter/quasar-alpha:free",
-        "nousresearch/nous-hermes-2-vision-7b:free"
+        "google/gemini-2.0-flash-exp:free",           // Top tier
+        "google/gemini-2.0-pro-exp-02-05:free",       // Experimental potente
+        "qwen/qwen-2.5-vl-72b-instruct:free",         // Excelente open source
+        "meta-llama/llama-3.2-90b-vision-instruct:free", // Llama Vision Grande
+        "meta-llama/llama-3.2-11b-vision-instruct:free", // Llama Vision Rápida
+        "mistralai/pixtral-12b:free",                 // Mistral Vision
+        "microsoft/phi-3.5-vision-instruct:free",     // Microsoft Vision
+        "google/gemini-flash-1.5-8b:free"             // Gemini Ligero
     ];
 
     try {
@@ -177,191 +154,175 @@ const analyzeImage = async (req, res) => {
         const userContext = req.body.context || "Sin contexto extra.";
         const imageBuffer = fs.readFileSync(req.file.path);
         const base64Image = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
-
         let foodData = null;
 
         const finalPrompt = `
-            Analiza esta imagen de comida. Actúa como nutricionista profesional.
-            CONTEXTO ADICIONAL DEL USUARIO: "${userContext}".
-            Identifica el alimento principal. Calcula sus macros aproximados.
-            RESPONDER SOLO CON UN OBJETO JSON VÁLIDO. SIN TEXTO ANTES NI DESPUÉS.
-            Formato JSON: { "name": "Nombre corto del plato", "calories": numero_entero, "protein": numero_entero, "carbs": numero_entero, "fat": numero_entero, "fiber": numero_entero, "servingSize": "ej: 1 ración media (200g)" }
-            Si la imagen NO es comida, responde SOLO: { "error": "No detecto comida válida" }
+        Analiza esta imagen de comida o etiqueta nutricional.
+        Contexto del usuario: "${userContext}".
+        Identifica el alimento y calcula sus macros totales aproximados.
+        
+        Responde SOLO con un JSON válido:
+        { 
+            "name": "Nombre corto del plato", 
+            "calories": int, 
+            "protein": int, 
+            "carbs": int, 
+            "fat": int, 
+            "fiber": int, 
+            "servingSize": "string" 
+        }
         `;
 
         for (const modelName of VISION_MODELS) {
             try {
-                console.log(`📷 Probando FOTO con ${modelName}...`);
-
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 25000);
+                console.log(`👁️ Intentando analizar imagen con: ${modelName}...`);
 
                 const completion = await openrouter.chat.completions.create({
                     model: modelName,
                     messages: [
-                        {
-                            role: "user",
-                            content: [
-                                { type: "text", text: finalPrompt },
-                                { type: "image_url", image_url: { url: base64Image, detail: "low" } }
-                            ]
-                        }
+                        { role: "user", content: [{ type: "text", text: finalPrompt }, { type: "image_url", image_url: { url: base64Image } }] }
                     ],
-                    temperature: 0.1,
-                    max_tokens: 300,
-                    signal: controller.signal
+                    temperature: 0.1
                 });
-                clearTimeout(timeoutId);
 
-                const text = completion.choices[0].message.content;
-
+                let text = completion.choices[0].message.content;
                 const startIndex = text.indexOf('{');
                 const endIndex = text.lastIndexOf('}');
 
                 if (startIndex !== -1 && endIndex !== -1) {
-                    let jsonStr = text.substring(startIndex, endIndex + 1);
-                    jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
-
+                    const jsonStr = text.substring(startIndex, endIndex + 1);
                     foodData = JSON.parse(jsonStr);
 
-                    if (foodData.error || (foodData.name && typeof foodData.calories === 'number')) {
-                        console.log(`✅ ÉXITO FOTO con ${modelName}`);
-                        break;
+                    // Validación simple para saber si la IA funcionó
+                    if (foodData.name && (typeof foodData.calories === 'number')) {
+                        console.log(`✅ ÉXITO con ${modelName}`);
+                        break; // Salimos del bucle si encontramos datos válidos
                     }
                 }
-            } catch (error) {
-                if (error.name === 'AbortError') {
-                    console.log(`⏳ Timeout con ${modelName}. Pasando al siguiente...`);
-                } else {
-                    console.log(`❌ Falló FOTO ${modelName}: ${error.status || error.message}`);
-                }
+            } catch (e) {
+                console.error(`❌ Falló visión ${modelName}: ${e.message}`);
             }
         }
 
+        // Borramos la imagen temporal del servidor
         if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
 
         if (foodData) {
-            if (foodData.error) return res.status(400).json({ message: foodData.error });
+            // Aseguramos enteros
             foodData.calories = Math.round(foodData.calories || 0);
             foodData.protein = Math.round(foodData.protein || 0);
             foodData.carbs = Math.round(foodData.carbs || 0);
             foodData.fat = Math.round(foodData.fat || 0);
             foodData.fiber = Math.round(foodData.fiber || 0);
+
             return res.json(foodData);
         } else {
-            return res.status(503).json({ message: 'Todos los sistemas de visión están saturados. Por favor, intenta introducirlo manualmente o prueba en unos minutos.' });
+            return res.status(503).json({ message: 'Ninguna IA pudo leer la imagen. Inténtalo de nuevo.' });
         }
-
     } catch (error) {
         if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        console.error("Error fatal en analyzeImage:", error);
-        res.status(500).json({ message: 'Error interno al procesar la imagen.' });
+        res.status(500).json({ message: 'Error interno imagen' });
     }
 };
 
-// --- GESTIÓN DE LOGS Y COMIDAS ---
+// ==========================================
+// 🔥 CRUD NUTRICIÓN COMPLETO 🔥
+// ==========================================
 
 const getNutritionLog = async (req, res) => {
     try {
         const today = getTodayStr();
-        let log = await NutritionLog.findOne({ user: req.user._id, date: today });
-        if (!log) {
-            log = await NutritionLog.create({
-                user: req.user._id,
-                date: today,
-                meals: [
-                    { name: 'DESAYUNO', foods: [] },
-                    { name: 'SNACK', foods: [] },
-                    { name: 'COMIDA', foods: [] },
-                    { name: 'MERIENDA', foods: [] },
-                    { name: 'CENA', foods: [] }
-                ]
-            });
-        }
+        const log = await NutritionLog.findOneAndUpdate(
+            { user: req.user._id, date: today },
+            {
+                $setOnInsert: {
+                    user: req.user._id,
+                    date: today,
+                    meals: [
+                        { name: 'DESAYUNO', foods: [] },
+                        { name: 'SNACK', foods: [] },
+                        { name: 'COMIDA', foods: [] },
+                        { name: 'MERIENDA', foods: [] },
+                        { name: 'CENA', foods: [] }
+                    ],
+                    totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0, totalFiber: 0
+                }
+            },
+            { new: true, upsert: true }
+        );
         res.json(log);
-    } catch (error) { res.status(500).json({ message: 'Error cargando nutrición' }); }
+    } catch (error) {
+        res.status(500).json({ message: 'Error cargando nutrición' });
+    }
 };
 
 const addMealCategory = async (req, res) => {
     try {
         const { name } = req.body;
         const today = getTodayStr();
-        let log = await NutritionLog.findOne({ user: req.user._id, date: today });
-        if (!log) return res.status(404).json({ message: 'Log no iniciado' });
-        log.meals.push({ name: name.toUpperCase(), foods: [] });
-        await log.save();
+        const log = await NutritionLog.findOneAndUpdate(
+            { user: req.user._id, date: today },
+            { $push: { meals: { name: name.toUpperCase(), foods: [] } } },
+            { new: true }
+        );
         res.json(log);
     } catch (error) { res.status(500).json({ message: 'Error creando categoría' }); }
 };
 
-const addFoodEntry = async (req, res) => {
+const addFoodToLog = async (req, res) => {
     try {
-        const { mealId, foodId, rawFood, quantity } = req.body;
+        const { mealId } = req.params;
+        const { name, calories, protein, carbs, fat, fiber, quantity } = req.body;
         const today = getTodayStr();
-        let entryData = {};
-
-        if (foodId) {
-            const foodItem = await Food.findById(foodId);
-            if (!foodItem) return res.status(404).json({ message: 'Alimento no encontrado' });
-            entryData = {
-                food: foodItem._id, name: foodItem.name, calories: foodItem.calories,
-                protein: foodItem.protein, carbs: foodItem.carbs, fat: foodItem.fat, fiber: foodItem.fiber || 0
-            };
-        } else if (rawFood) {
-            entryData = {
-                name: rawFood.name, calories: rawFood.calories,
-                protein: rawFood.protein, carbs: rawFood.carbs, fat: rawFood.fat, fiber: rawFood.fiber || 0
-            };
-        } else { return res.status(400).json({ message: 'Faltan datos' }); }
-
-        const finalEntry = {
-            ...entryData,
-            calories: Math.round(entryData.calories * quantity),
-            protein: Math.round(entryData.protein * quantity),
-            carbs: Math.round(entryData.carbs * quantity),
-            fat: Math.round(entryData.fat * quantity),
-            fiber: Math.round(entryData.fiber * quantity),
-            quantity
-        };
 
         let log = await NutritionLog.findOne({ user: req.user._id, date: today });
-        if (!log) log = await NutritionLog.create({ user: req.user._id, date: today, meals: [] });
+        if (!log) return res.status(404).json({ message: 'Registro no encontrado' });
 
-        const mealBox = log.meals.id(mealId);
-        if (!mealBox) return res.status(404).json({ message: 'Caja no encontrada' });
+        const meal = log.meals.id(mealId);
+        if (!meal) return res.status(404).json({ message: 'Comida no encontrada' });
 
-        mealBox.foods.push(finalEntry);
+        const newFood = {
+            name,
+            calories: Number(calories),
+            protein: Number(protein || 0),
+            carbs: Number(carbs || 0),
+            fat: Number(fat || 0),
+            fiber: Number(fiber || 0),
+            quantity: Number(quantity || 1)
+        };
 
-        log.totalCalories += finalEntry.calories;
-        log.totalProtein += finalEntry.protein;
-        log.totalCarbs += finalEntry.carbs;
-        log.totalFat += finalEntry.fat;
-        log.totalFiber += finalEntry.fiber;
+        meal.foods.push(newFood);
+
+        log.totalCalories = Math.round(log.totalCalories + newFood.calories);
+        log.totalProtein = Math.round(log.totalProtein + newFood.protein);
+        log.totalCarbs = Math.round(log.totalCarbs + newFood.carbs);
+        log.totalFat = Math.round(log.totalFat + newFood.fat);
+        log.totalFiber = Math.round(log.totalFiber + newFood.fiber);
 
         await log.save();
 
-        const getMealTotal = (name) => {
-            const meal = log.meals.find(m => m.name === name);
-            return meal ? meal.foods.reduce((acc, f) => acc + f.calories, 0) : 0;
-        };
-
-        const nutritionBreakdown = {
-            totalKcal: log.totalCalories,
-            breakfast: getMealTotal('DESAYUNO'),
-            lunch: getMealTotal('COMIDA'),
-            dinner: getMealTotal('CENA'),
-            snacks: getMealTotal('SNACK'),
-            merienda: getMealTotal('MERIENDA')
-        };
-
         await DailyLog.findOneAndUpdate(
             { user: req.user._id, date: today },
-            { nutrition: nutritionBreakdown },
-            { upsert: true }
+            { $set: { "nutrition.totalKcal": log.totalCalories } }
         );
 
         res.json(log);
-    } catch (error) { console.error(error); res.status(500).json({ message: 'Error añadiendo comida' }); }
+    } catch (error) {
+        console.error("Error addFoodToLog:", error);
+        res.status(500).json({ message: 'Error guardando alimento' });
+    }
+};
+
+const searchFoods = async (req, res) => {
+    try {
+        const { query } = req.query;
+        if (!query) return res.json([]);
+        const foods = await Food.find({
+            name: { $regex: query, $options: 'i' },
+            $or: [{ user: req.user._id }, { user: null }, { user: { $exists: false } }]
+        }).limit(20);
+        res.json(foods);
+    } catch (error) { res.status(500).json({ message: 'Error en búsqueda' }); }
 };
 
 const getSavedFoods = async (req, res) => {
@@ -376,10 +337,7 @@ const saveCustomFood = async (req, res) => {
         const { name, calories, protein, carbs, fat, fiber, servingSize } = req.body;
         const newFood = await Food.create({
             user: req.user._id,
-            name, calories, protein, carbs, fat,
-            fiber: fiber || 0,
-            servingSize: servingSize || '1 ración',
-            icon: '🍽️'
+            name, calories, protein, carbs, fat, fiber: fiber || 0, servingSize: servingSize || '1 ración', icon: '🍽️'
         });
         res.status(201).json(newFood);
     } catch (error) { res.status(500).json({ message: 'Error guardando comida' }); }
@@ -387,29 +345,25 @@ const saveCustomFood = async (req, res) => {
 
 const deleteSavedFood = async (req, res) => {
     try {
-        const result = await Food.findOneAndDelete({ _id: req.params.id, user: req.user._id });
-        if (!result) return res.status(404).json({ message: 'No encontrado' });
+        await Food.findOneAndDelete({ _id: req.params.id, user: req.user._id });
         res.json({ message: 'Eliminado' });
     } catch (error) { res.status(500).json({ message: 'Error eliminando' }); }
 };
 
 const updateSavedFood = async (req, res) => {
     try {
-        const { name, calories, protein, carbs, fat, fiber } = req.body;
-        const updatedFood = await Food.findOneAndUpdate(
-            { _id: req.params.id, user: req.user._id },
-            { name, calories, protein, carbs, fat, fiber },
-            { new: true }
-        );
-        if (!updatedFood) return res.status(404).json({ message: 'Error' });
-        res.json(updatedFood);
+        const updated = await Food.findOneAndUpdate({ _id: req.params.id, user: req.user._id }, req.body, { new: true });
+        res.json(updated);
     } catch (error) { res.status(500).json({ message: 'Error actualizando' }); }
 };
 
 const seedFoods = async (req, res) => { res.json({ message: 'Seed desactivado' }); };
+const addFoodEntry = async (req, res) => { res.status(404).json({ message: "Usar addFoodToLog (/log/:id)" }); };
 
 module.exports = {
-    getNutritionLog, addFoodEntry, addMealCategory, seedFoods,
+    getNutritionLog, addMealCategory, seedFoods,
     analyzeImage, getSavedFoods, saveCustomFood, deleteSavedFood,
-    chatMacroCalculator, updateSavedFood
+    updateSavedFood, chatMacroCalculator,
+    addFoodToLog, searchFoods, addFoodEntry,
+    analyzeFoodText
 };

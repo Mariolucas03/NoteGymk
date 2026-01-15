@@ -2,6 +2,8 @@ const cron = require('node-cron');
 const Mission = require('../models/Mission');
 const User = require('../models/User');
 const DailyLog = require('../models/DailyLog');
+const { sendPushToUser } = require('../controllers/pushController');
+const { addRewards } = require('../services/levelService'); // Importamos para sumar recompensas de forma segura
 
 // Función auxiliar para obtener fecha en String (Zona horaria Madrid)
 const getMadridDateString = (dateObj) => {
@@ -11,8 +13,78 @@ const getMadridDateString = (dateObj) => {
     }).format(dateObj);
 };
 
+// --- 🔥 NUEVA FUNCIÓN: Recordatorio Nocturno (20:00) ---
+const runEveningReminder = async () => {
+    console.log("🔔 Ejecutando recordatorio de misiones (20:00)...");
+
+    // Buscamos usuarios que tengan suscripciones push activas
+    const usersToWarn = await User.find({
+        pushSubscriptions: { $exists: true, $not: { $size: 0 } }
+    });
+
+    for (const user of usersToWarn) {
+        // Verificar misiones de HOY pendientes
+        const todayDay = new Date().getDay();
+        const pendingCount = await Mission.countDocuments({
+            user: user._id,
+            frequency: 'daily',
+            completed: false,
+            $or: [
+                { specificDays: { $size: 0 } },
+                { specificDays: todayDay }
+            ]
+        });
+
+        if (pendingCount > 0) {
+            const payload = {
+                title: "⚠️ ¡Peligro de Daño!",
+                body: `Tienes ${pendingCount} misiones pendientes. Complétalas antes de medianoche o perderás HP.`,
+                icon: "/assets/icons/icon-192x192.png", // Asegúrate de que esta ruta coincida con tu frontend
+                url: "/missions" // Al hacer clic va a misiones
+            };
+            await sendPushToUser(user, payload);
+            console.log(`📨 Notificación enviada a ${user.username}`);
+        }
+    }
+};
+
+// --- 🔥 NUEVA FUNCIÓN: PREMIOS MENSUALES RANKING ---
+const runMonthlyRankingRewards = async () => {
+    console.log("🏆 Ejecutando premios mensuales del ranking...");
+
+    // Obtener Top 3 Global por Nivel y XP
+    const topUsers = await User.find({})
+        .sort({ level: -1, currentXP: -1 })
+        .limit(3);
+
+    const PRIZES = [10000, 5000, 2500]; // 1º, 2º, 3º
+
+    for (let i = 0; i < topUsers.length; i++) {
+        const user = topUsers[i];
+        const prize = PRIZES[i];
+
+        if (!user) continue;
+
+        try {
+            // Usamos el servicio de niveles para sumar de forma segura y subir nivel si aplica
+            await addRewards(user._id, 0, 0, prize);
+
+            // Notificación Push al ganador
+            const payload = {
+                title: `🏆 ¡Premio Mensual Ranking #${i + 1}!`,
+                body: `¡Felicidades! Has ganado ${prize} Fichas por ser de los mejores este mes.`,
+                icon: "/assets/icons/ficha.png",
+                url: "/social"
+            };
+            await sendPushToUser(user, payload);
+            console.log(`🎁 Premio mensual enviado a ${user.username}: ${prize} fichas`);
+        } catch (error) {
+            console.error(`Error enviando premio a ${user.username}`, error);
+        }
+    }
+};
+
 // --- LÓGICA CORE DE CASTIGO (SEPARADA) ---
-// Esta función se puede llamar desde el CRON o manualmente desde el botón de Debug
 const runNightlyMaintenance = async () => {
     console.log("🌙 EJECUTANDO MANTENIMIENTO NOCTURNO (MANUAL O CRON)...");
     const now = new Date();
@@ -24,7 +96,6 @@ const runNightlyMaintenance = async () => {
 
     try {
         // 2. ¿QUÉ CICLOS VENCIERON?
-        // Daily vence siempre. Weekly si ayer fue Domingo. Monthly si hoy es día 1.
         const frequenciesToPunish = ['daily'];
         if (yesterday.getDay() === 0) frequenciesToPunish.push('weekly');
 
@@ -34,7 +105,6 @@ const runNightlyMaintenance = async () => {
         console.log(`⚔️ Evaluando ciclos: ${frequenciesToPunish.join(', ')}`);
 
         // 3. BUSCAR MISIONES FALLIDAS (No completadas)
-        // Buscamos misiones de esas frecuencias que NO estén completadas
         const failedMissions = await Mission.find({
             frequency: { $in: frequenciesToPunish },
             completed: false
@@ -71,11 +141,9 @@ const runNightlyMaintenance = async () => {
                         const oldHp = user.hp !== undefined ? user.hp : 100;
                         const newHp = Math.max(0, oldHp - data.damage);
 
-                        // 🔥 ACTUALIZAMOS AMBOS CAMPOS (hp y lives) POR SEGURIDAD
                         user.hp = newHp;
                         user.lives = newHp;
 
-                        // Si falla una misión diaria, la racha se reinicia a 0
                         if (data.failedItems.some(m => m.frequency === 'daily')) {
                             user.streak.current = 0;
                         }
@@ -83,7 +151,6 @@ const runNightlyMaintenance = async () => {
                         await user.save();
                         console.log(`💀 Usuario ${user.username} bajó a ${newHp} HP (-${data.damage})`);
 
-                        // Guardar constancia en el DailyLog de "ayer"
                         await DailyLog.findOneAndUpdate(
                             { user: userId, date: yesterdayStr },
                             {
@@ -101,7 +168,7 @@ const runNightlyMaintenance = async () => {
             console.log("✨ Nadie falló misiones ayer.");
         }
 
-        // 4. LIMPIEZA (Resetear hábitos, borrar temporales)
+        // 4. LIMPIEZA
         for (const freq of frequenciesToPunish) {
             await processCycle(freq);
         }
@@ -120,14 +187,12 @@ async function processCycle(frequency) {
     yesterdayDate.setDate(yesterdayDate.getDate() - 1);
     const yesterdayDayNum = yesterdayDate.getDay();
 
-    // 1. Resetear Hábitos (Poner completed: false)
     const habitsResult = await Mission.updateMany(
         { frequency: frequency, type: 'habit' },
         { $set: { completed: false, progress: 0, lastUpdated: new Date() } }
     );
     if (habitsResult.modifiedCount > 0) console.log(`🔄 [${frequency}] ${habitsResult.modifiedCount} Hábitos reiniciados.`);
 
-    // 2. Borrar Temporales (Solo si eran de AYER o Todos los días)
     const tempResult = await Mission.deleteMany({
         frequency: frequency,
         type: 'temporal',
@@ -136,12 +201,22 @@ async function processCycle(frequency) {
     if (tempResult.deletedCount > 0) console.log(`🗑️ [${frequency}] ${tempResult.deletedCount} Temporales borradas.`);
 }
 
-// Inicializador del CRON (Automático a las 4 AM)
+// Inicializador del CRON
 const initScheduledJobs = () => {
+    // 1. Mantenimiento Nocturno (Castigo) a las 4 AM
     cron.schedule('0 4 * * *', async () => {
         await runNightlyMaintenance();
     }, { scheduled: true, timezone: "Europe/Madrid" });
+
+    // 2. Recordatorio a las 20:00 PM
+    cron.schedule('0 20 * * *', async () => {
+        await runEveningReminder();
+    }, { scheduled: true, timezone: "Europe/Madrid" });
+
+    // 3. 🔥 Premios Mensuales (Día 1 de cada mes a las 00:00)
+    cron.schedule('0 0 1 * *', async () => {
+        await runMonthlyRankingRewards();
+    }, { scheduled: true, timezone: "Europe/Madrid" });
 };
 
-// 🔥 IMPORTANTE: Exportamos tanto el init como la función manual
 module.exports = { initScheduledJobs, runNightlyMaintenance };

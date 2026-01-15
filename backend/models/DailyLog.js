@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// Sub-esquemas existentes...
+// --- SUB-ESQUEMAS ---
 const SetSchema = new mongoose.Schema({
     weight: { type: Number, required: true },
     reps: { type: Number, required: true }
@@ -11,26 +11,18 @@ const ExerciseSchema = new mongoose.Schema({
     sets: [SetSchema]
 }, { _id: false });
 
-// 🔥 ACTUALIZADO: Esquema de Misión Histórica
 const CompletedMissionSchema = new mongoose.Schema({
     title: { type: String, required: true },
-
-    // Recompensas
     xpReward: { type: Number, default: 0 },
     coinReward: { type: Number, default: 0 },
     gameCoinReward: { type: Number, default: 0 },
-
-    // Meta-datos
     frequency: { type: String },
     difficulty: { type: String },
     type: { type: String },
-
-    // 🔥 NUEVOS CAMPOS PARA FALLOS
-    failed: { type: Boolean, default: false }, // ¿Fue completada o fallida?
-    hpLoss: { type: Number, default: 0 }       // ¿Cuánta vida costó?
+    failed: { type: Boolean, default: false },
+    hpLoss: { type: Number, default: 0 }
 }, { _id: false });
 
-// Esquemas de deporte y gym...
 const SportSchema = new mongoose.Schema({
     routineName: String,
     distance: Number,
@@ -46,18 +38,15 @@ const GymSessionSchema = new mongoose.Schema({
     earnedXP: { type: Number, default: 0 },
     earnedCoins: { type: Number, default: 0 },
     caloriesBurned: { type: Number, default: 0 },
-
-    // 🔥 AÑADIR ESTO:
     intensity: { type: String, default: 'Normal' },
-
     exercises: [ExerciseSchema],
     timestamp: { type: Date, default: Date.now }
 }, { _id: false });
 
-
+// --- ESQUEMA PRINCIPAL ---
 const dailyLogSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-    date: { type: String, required: true },
+    date: { type: String, required: true }, // Formato YYYY-MM-DD
 
     mood: { type: String, default: null },
     weight: { type: Number, default: null },
@@ -80,17 +69,18 @@ const dailyLogSchema = new mongoose.Schema({
     missionStats: {
         completed: { type: Number, default: 0 },
         total: { type: Number, default: 3 },
-        listCompleted: [CompletedMissionSchema] // Array mixto (Completadas + Fallidas)
+        listCompleted: [CompletedMissionSchema]
     },
 
     gains: {
         coins: { type: Number, default: 0 },
         xp: { type: Number, default: 0 },
-        lives: { type: Number, default: 0 } // Vidas perdidas ese día (opcional)
+        lives: { type: Number, default: 0 }
     }
 
 }, { timestamps: true });
 
+// 🔥 IMPORTANTE: Evita duplicados de días
 dailyLogSchema.index({ user: 1, date: 1 }, { unique: true });
 
 module.exports = mongoose.model('DailyLog', dailyLogSchema);

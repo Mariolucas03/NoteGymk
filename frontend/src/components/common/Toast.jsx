@@ -2,31 +2,37 @@ import { useEffect } from 'react';
 import { CheckCircle, AlertCircle, X } from 'lucide-react';
 
 export default function Toast({ message, type = 'success', onClose }) {
-    // Autocierre a los 3 segundos
+
     useEffect(() => {
         const timer = setTimeout(() => {
             onClose();
-        }, 3000);
+        }, 3000); // Se va solo a los 3 segundos
         return () => clearTimeout(timer);
     }, [onClose]);
 
+    // Colores según tipo
+    const styles = type === 'success'
+        ? 'bg-green-500/10 border-green-500 text-green-500'
+        : type === 'error'
+            ? 'bg-red-500/10 border-red-500 text-red-500'
+            : 'bg-blue-500/10 border-blue-500 text-blue-500';
+
+    const Icon = type === 'success' ? CheckCircle : AlertCircle;
+
     return (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top fade-in duration-300">
-            <div className={`
-        flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-md min-w-[300px]
-        ${type === 'success' ? 'bg-green-900/80 border-green-500/50 text-green-100' : 'bg-red-900/80 border-red-500/50 text-red-100'}
-      `}>
-                {/* Icono Dinámico */}
-                {type === 'success' ? <CheckCircle size={20} className="text-green-400" /> : <AlertCircle size={20} className="text-red-400" />}
-
-                {/* Mensaje */}
-                <p className="flex-1 text-sm font-medium">{message}</p>
-
-                {/* Botón Cerrar */}
-                <button onClick={onClose} className="opacity-70 hover:opacity-100">
-                    <X size={16} />
-                </button>
+        // 🔥 CAMBIO: 'fixed bottom-24' en lugar de top. Centrado horizontalmente.
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-4 py-3 rounded-2xl border backdrop-blur-md shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300 w-[90%] max-w-sm">
+            <div className={`p-2 rounded-full ${styles} bg-opacity-20`}>
+                <Icon size={20} />
             </div>
+            <div className="flex-1">
+                <p className={`text-sm font-bold ${type === 'success' ? 'text-white' : 'text-white'}`}>
+                    {message}
+                </p>
+            </div>
+            <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
+                <X size={18} />
+            </button>
         </div>
     );
 }

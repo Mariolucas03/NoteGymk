@@ -1,219 +1,413 @@
-import { useState, useEffect, useRef } from 'react';
-import { useOutletContext, Link } from 'react-router-dom';
-import { ChevronLeft, RotateCcw, History, ChevronUp, ChevronDown, Disc } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useOutletContext, Link, useNavigate } from 'react-router-dom';
+import { ChevronLeft, Info, X, Trash2, Undo2, ChevronDown, ChevronUp, Trophy, Frown, Paintbrush } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import api from '../../services/api';
 
+// --- CONSTANTES ---
 const WHEEL_NUMBERS = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
-const CHIPS = [1, 5, 10, 25, 100, 500];
 const SEGMENT_ANGLE = 360 / 37;
+const CHIP_VALUES = [10, 20, 50, 100, 500];
+const SPIN_DURATION = 3500;
 
-export default function Roulette() {
-    const { user, setUser } = useOutletContext();
-    // 🔥 USAR FICHAS
-    const currentFichas = user?.stats?.gameCoins || 0;
+const TABLE_ROWS = [
+    [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36],
+    [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35],
+    [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
+];
 
-    const [selectedChip, setSelectedChip] = useState(5);
-    const [bets, setBets] = useState({});
-    const [totalBet, setTotalBet] = useState(0);
-    const [history, setHistory] = useState([]);
-    const [showHistory, setShowHistory] = useState(false);
-    const [showBoard, setShowBoard] = useState(true);
-    const [spinning, setSpinning] = useState(false);
-    const [rotation, setRotation] = useState(0);
-    const [lastResult, setLastResult] = useState(null);
-    const animationRef = useRef(null);
-
-    useEffect(() => {
-        const animate = () => { if (!spinning) setRotation(prev => (prev + 0.05) % 360); animationRef.current = requestAnimationFrame(animate); };
-        animationRef.current = requestAnimationFrame(animate);
-        return () => cancelAnimationFrame(animationRef.current);
-    }, [spinning]);
-
-    const getNumberColor = (num) => {
-        if (num === 0) return 'green';
-        const redNums = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
-        return redNums.includes(num) ? 'red' : 'black';
-    };
-
-    const placeBet = (spots) => {
-        if (spinning) return;
-        if (currentFichas < totalBet + selectedChip) return;
-        const spotKey = Array.isArray(spots) ? `multi-${spots.sort((a, b) => a - b).join('-')}` : spots;
-        setBets(prev => ({ ...prev, [spotKey]: (prev[spotKey] || 0) + selectedChip }));
-        setTotalBet(prev => prev + selectedChip);
-    };
-
-    const clearBets = () => { if (spinning) return; setBets({}); setTotalBet(0); };
-
-    const spinWheel = async () => {
-        if (spinning || totalBet === 0) return;
-        setSpinning(true);
-        setShowBoard(false);
-        setLastResult(null);
-
-        // COBRAR
-        const newBalance = currentFichas - totalBet;
-        setUser({ ...user, stats: { ...user.stats, gameCoins: newBalance } });
-        try { await api.post('/users/reward', { gameCoins: -totalBet }); } catch (e) { }
-
-        const randomIndex = Math.floor(Math.random() * WHEEL_NUMBERS.length);
-        const winningNumber = WHEEL_NUMBERS[randomIndex];
-        const currentRot = rotation % 360;
-        const winnerCenterAngle = (randomIndex * SEGMENT_ANGLE) + (SEGMENT_ANGLE / 2);
-        const distanceToZero = (360 - winnerCenterAngle);
-        const targetRotation = rotation + (360 * 10) + (360 - currentRot) + distanceToZero;
-
-        setRotation(targetRotation);
-        setTimeout(() => finishGame(winningNumber), 5000);
-    };
-
-    const finishGame = async (winningNumber) => {
-        setSpinning(false);
-        setLastResult(winningNumber);
-        setHistory(prev => [winningNumber, ...prev].slice(0, 10));
-        setRotation(prev => prev % 360);
-        setTimeout(() => setShowBoard(true), 1500);
-
-        let winnings = 0;
-        const color = getNumberColor(winningNumber);
-
-        Object.entries(bets).forEach(([key, amount]) => {
-            if (key.startsWith('multi-')) {
-                const nums = key.replace('multi-', '').split('-').map(Number);
-                if (nums.includes(winningNumber)) winnings += amount * (36 / nums.length);
-            } else {
-                const n = parseInt(key);
-                if (!isNaN(n) && n === winningNumber) winnings += amount * 36;
-                else if (key === 'red' && color === 'red') winnings += amount * 2;
-                else if (key === 'black' && color === 'black') winnings += amount * 2;
-                else if (key === 'even' && winningNumber !== 0 && winningNumber % 2 === 0) winnings += amount * 2;
-                else if (key === 'odd' && winningNumber !== 0 && winningNumber % 2 !== 0) winnings += amount * 2;
-                else if (key === '1st12' && winningNumber >= 1 && winningNumber <= 12) winnings += amount * 3;
-                else if (key === '2nd12' && winningNumber >= 13 && winningNumber <= 24) winnings += amount * 3;
-                else if (key === '3rd12' && winningNumber >= 25 && winningNumber <= 36) winnings += amount * 3;
-                else if (key === 'col1' && winningNumber > 0 && winningNumber % 3 === 1) winnings += amount * 3;
-                else if (key === 'col2' && winningNumber > 0 && winningNumber % 3 === 2) winnings += amount * 3;
-                else if (key === 'col3' && winningNumber > 0 && winningNumber % 3 === 0) winnings += amount * 3;
-            }
-        });
-
-        if (winnings > 0) {
-            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-            // Sumar al saldo (usamos user del context actualizado)
-            // Como ya restamos la apuesta, ahora solo sumamos el premio
-            setUser(prev => ({
-                ...prev,
-                stats: { ...prev.stats, gameCoins: prev.stats.gameCoins + winnings }
-            }));
-
-            try { await api.post('/users/reward', { gameCoins: winnings, xp: 10 }); } catch (e) { }
-        }
-        setBets({});
-        setTotalBet(0);
-    };
-
-    const ChipVisual = ({ amount, scale = "scale-100" }) => (
-        <div className={`absolute inset-0 flex items-center justify-center z-50 pointer-events-none ${scale}`}>
-            <div className="w-6 h-6 rounded-full bg-yellow-500 border-2 border-dashed border-yellow-200 text-black text-[9px] flex items-center justify-center font-black shadow-[0_2px_5px_rgba(0,0,0,0.5)] animate-in zoom-in">{amount}</div>
+// --- LLUVIA DE FICHAS ---
+const ChipRain = ({ isFading }) => {
+    const [drops] = useState(() => Array.from({ length: 100 }).map((_, i) => ({
+        id: i, left: Math.random() * 100, startTop: -(Math.random() * 100 + 10), delay: Math.random() * 0.5, duration: 1 + Math.random(), size: 15 + Math.random() * 30, opacity: 0.4 + Math.random() * 0.6,
+    })));
+    return (
+        <div className={`fixed inset-0 pointer-events-none z-[9999] overflow-hidden transition-opacity duration-1000 ${isFading ? 'opacity-0' : 'opacity-100'}`}>
+            <style>{`@keyframes cascadeFall { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(150vh) rotate(720deg); } }`}</style>
+            {drops.map((d) => <img key={d.id} src="/assets/icons/ficha.png" className="absolute will-change-transform" style={{ left: `${d.left}%`, top: `${d.startTop}vh`, width: `${d.size}px`, opacity: d.opacity, animation: `cascadeFall ${d.duration}s linear ${d.delay}s infinite` }} alt="" />)}
         </div>
     );
+};
+
+export default function Roulette() {
+    const { user, setUser, setIsUiHidden } = useOutletContext();
+    const navigate = useNavigate();
+
+    // SALDO VISUAL
+    const [visualBalance, setVisualBalance] = useState(user?.stats?.gameCoins ?? user?.gameCoins ?? 0);
+
+    useEffect(() => {
+        setVisualBalance(user?.stats?.gameCoins ?? user?.gameCoins ?? 0);
+    }, [user?.stats?.gameCoins]);
+
+    useEffect(() => { setIsUiHidden(true); return () => setIsUiHidden(false); }, [setIsUiHidden]);
+
+    // Estados Juego
+    const [selectedChip, setSelectedChip] = useState(10);
+    const [bets, setBets] = useState([]);
+    const currentBetTotal = useMemo(() => bets.reduce((acc, b) => acc + b.amount, 0), [bets]);
+
+    // UI Modos
+    const [paintMode, setPaintMode] = useState(false);
+    const [isPointerDown, setIsPointerDown] = useState(false);
+    const lastPaintedNumber = useRef(null);
+    const [isTableOpen, setIsTableOpen] = useState(false);
+
+    // Animación
+    const [spinning, setSpinning] = useState(false);
+    const [wheelRotation, setWheelRotation] = useState(0);
+    const [ballRotation, setBallRotation] = useState(0);
+    const [ballDistance, setBallDistance] = useState(100);
+
+    const [resultModal, setResultModal] = useState(null);
+    const [showInfo, setShowInfo] = useState(false);
+    const [showRain, setShowRain] = useState(false);
+    const [isRainFading, setIsRainFading] = useState(false);
+
+    // --- SYNC ---
+    const syncUserWithServer = (serverUser) => {
+        if (serverUser) {
+            setUser(prev => {
+                const updated = { ...prev, ...serverUser };
+                if (serverUser.gameCoins !== undefined) {
+                    updated.stats = { ...updated.stats, gameCoins: serverUser.gameCoins };
+                }
+                localStorage.setItem('user', JSON.stringify(updated));
+                return updated;
+            });
+        }
+    };
+
+    // --- APUESTAS ---
+    const placeBet = (type, value, numbersCovered, multiplier) => {
+        if (spinning) return;
+        if (visualBalance < selectedChip) return;
+
+        setVisualBalance(prev => prev - selectedChip);
+        const newBet = { id: Math.random(), amount: selectedChip, type, value, numbers: numbersCovered, multiplier };
+        setBets(prev => [...prev, newBet]);
+    };
+
+    const undoLastBet = () => {
+        if (!spinning && bets.length > 0) {
+            const lastBet = bets[bets.length - 1];
+            setVisualBalance(prev => prev + lastBet.amount);
+            setBets(prev => prev.slice(0, -1));
+        }
+    };
+
+    const clearBets = () => {
+        if (!spinning && bets.length > 0) {
+            setVisualBalance(prev => prev + currentBetTotal);
+            setBets([]);
+        }
+    };
+
+    // --- PINTAR ---
+    const handleInteractionStart = (num) => {
+        setIsPointerDown(true);
+        if (paintMode || !isPointerDown) {
+            placeBet('number', num, [num], 36);
+            lastPaintedNumber.current = num;
+        }
+    };
+
+    const handleInteractionMove = (e) => {
+        if (!paintMode || !isPointerDown) return;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const element = document.elementFromPoint(clientX, clientY);
+        if (element && element.dataset.number) {
+            const num = parseInt(element.dataset.number);
+            if (num !== lastPaintedNumber.current) {
+                placeBet('number', num, [num], 36);
+                lastPaintedNumber.current = num;
+            }
+        }
+    };
+
+    const handleInteractionEnd = () => {
+        setIsPointerDown(false);
+        lastPaintedNumber.current = null;
+    };
+
+    const handleNumberClick = (num) => !paintMode && placeBet('number', num, [num], 36);
+
+    // --- JUGAR ---
+    const spin = async () => {
+        if (bets.length === 0) {
+            if (!isTableOpen) setIsTableOpen(true);
+            return;
+        }
+        if (spinning) return;
+
+        api.post('/users/reward', { gameCoins: -currentBetTotal })
+            .then(res => syncUserWithServer(res.data.user))
+            .catch(err => {
+                console.error(err);
+                setVisualBalance(prev => prev + currentBetTotal);
+                setBets([]);
+                alert("Error de conexión");
+                return;
+            });
+
+        setIsTableOpen(false);
+        setSpinning(true);
+        setResultModal(null);
+        setShowRain(false);
+        setIsRainFading(false);
+        setBallDistance(100);
+
+        const winIndex = Math.floor(Math.random() * WHEEL_NUMBERS.length);
+        const winNum = WHEEL_NUMBERS[winIndex];
+
+        // Animación
+        const wheelSpins = 5;
+        const segmentCenterOffset = SEGMENT_ANGLE / 2;
+        const currentRotationNormalized = wheelRotation % 360;
+        const targetAngle = winIndex * SEGMENT_ANGLE;
+
+        const newWheelRotation = wheelRotation + (360 * wheelSpins) + (targetAngle - currentRotationNormalized);
+        setWheelRotation(newWheelRotation);
+
+        const ballSpins = 8 * 360;
+        setBallRotation(ballRotation + ballSpins);
+
+        setTimeout(() => setBallDistance(54), SPIN_DURATION - 800);
+
+        setTimeout(() => {
+            setSpinning(false);
+            resolveGame(winNum, [...bets]);
+        }, SPIN_DURATION);
+    };
+
+    const resolveGame = (winNum, playedBets) => {
+        let totalWin = 0;
+        playedBets.forEach(bet => {
+            if (bet.numbers.includes(winNum)) totalWin += bet.amount * bet.multiplier;
+        });
+
+        setBets([]);
+
+        const isRed = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(winNum);
+        const winColor = winNum === 0 ? 'green' : isRed ? 'red' : 'black';
+
+        if (totalWin > 0) {
+            setVisualBalance(prev => prev + totalWin);
+            setShowRain(true);
+            setTimeout(() => { setIsRainFading(true); setTimeout(() => setShowRain(false), 1000); }, 3000);
+            confetti();
+            api.post('/users/reward', { gameCoins: totalWin })
+                .then(res => syncUserWithServer(res.data.user))
+                .catch(console.error);
+        } else {
+            api.get('/auth/me').then(res => syncUserWithServer(res.data)).catch(() => { });
+        }
+
+        setResultModal({ won: totalWin > 0, num: winNum, color: winColor, payout: totalWin });
+    };
+
+    // --- ESTILOS ---
+    const getNumColor = (n) => {
+        if (n === 0) return 'bg-green-700 border-green-500';
+        const isRed = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(n);
+        return isRed ? 'bg-red-700 border-red-500' : 'bg-zinc-800 border-zinc-600';
+    };
+
+    const getChipColorStyle = (val) => {
+        if (val === 10) return 'bg-red-600 border-red-400 text-white';
+        if (val === 20) return 'bg-blue-600 border-blue-400 text-white';
+        if (val === 50) return 'bg-green-600 border-green-400 text-white';
+        if (val === 100) return 'bg-zinc-900 border-zinc-500 text-white';
+        if (val === 500) return 'bg-yellow-500 border-yellow-300 text-black';
+        return 'bg-zinc-700';
+    };
+
+    const getConsolidatedChipBgColor = (totalValue) => {
+        if (totalValue >= 500) return 'bg-yellow-500 text-black';
+        if (totalValue >= 100) return 'bg-zinc-900 text-white';
+        if (totalValue >= 50) return 'bg-green-600 text-white';
+        if (totalValue >= 20) return 'bg-blue-600 text-white';
+        return 'bg-red-600 text-white';
+    };
+
+    const renderBoardChip = (filterFn) => {
+        const chipsOnSpot = bets.filter(filterFn);
+        if (chipsOnSpot.length === 0) return null;
+        const totalOnSpot = chipsOnSpot.reduce((acc, bet) => acc + bet.amount, 0);
+        return (
+            <div className={`absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full border border-white shadow-lg flex items-center justify-center text-[8px] font-black leading-none ${getConsolidatedChipBgColor(totalOnSpot)} pointer-events-none animate-in zoom-in duration-200`}>
+                {totalOnSpot}
+            </div>
+        );
+    };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-80px)] w-full bg-zinc-950 overflow-hidden relative text-white select-none">
+        <div
+            className="fixed inset-0 bg-black flex flex-col items-center pt-20 overflow-hidden select-none font-sans"
+            onMouseUp={handleInteractionEnd}
+            onMouseLeave={handleInteractionEnd}
+            onTouchEnd={handleInteractionEnd}
+            onTouchMove={handleInteractionMove}
+        >
+            {showRain && <ChipRain isFading={isRainFading} />}
+
             {/* HEADER */}
-            <div className="shrink-0 h-14 flex items-center justify-between px-4 bg-zinc-900/80 border-b border-white/5 z-40">
-                <div className="flex items-center gap-3">
-                    <Link to="/games" className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition"><ChevronLeft size={20} /></Link>
-                    <h1 className="font-black tracking-tighter text-lg uppercase italic flex items-center gap-2"><Disc className="text-red-500" /> Ruleta</h1>
+            <div className="absolute top-12 left-4 right-4 flex justify-between items-center z-20">
+                <button onClick={() => navigate('/games')} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><ChevronLeft /></button>
+                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-yellow-500/50 backdrop-blur-md shadow-2xl transition-all duration-200">
+                    <span className="text-yellow-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
+                    <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
-                <div className="flex items-center gap-3">
-                    <div className="bg-purple-900/40 border border-purple-500/30 px-3 py-1 rounded-xl flex flex-col items-end backdrop-blur-md">
-                        <span className="text-base font-black text-white leading-none">{currentFichas}</span>
-                        <span className="text-purple-400 text-[9px] font-bold uppercase leading-none">Fichas</span>
-                    </div>
-                    <button onClick={() => setShowHistory(!showHistory)} className={`p-2 rounded-lg transition ${showHistory ? 'bg-yellow-500 text-black' : 'bg-white/5 text-gray-400'}`}><History size={20} /></button>
-                </div>
+                <button onClick={() => setShowInfo(true)} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
             </div>
 
-            <div className="flex-grow flex items-center justify-center relative bg-[radial-gradient(circle_at_center,_#1a3d2b_0%,_#09090b_100%)]">
-                <div className="relative w-[80vw] h-[80vw] max-w-[450px] max-h-[450px]">
-                    <div className="w-full h-full rounded-full border-[15px] border-[#3e2b1f] shadow-2xl relative overflow-hidden" style={{ transform: `rotate(${rotation}deg)`, transition: spinning ? 'transform 5s cubic-bezier(0.15, 0, 0.15, 1)' : 'none' }}>
-                        <div className="absolute inset-0" style={{ background: `conic-gradient(${WHEEL_NUMBERS.map((n, i) => `${getNumberColor(n) === 'red' ? '#b91c1c' : getNumberColor(n) === 'black' ? '#111' : '#15803d'} ${i * SEGMENT_ANGLE}deg ${(i + 1) * SEGMENT_ANGLE}deg`).join(', ')})` }}></div>
-                        {WHEEL_NUMBERS.map((n, i) => (
-                            <div key={i} className="absolute top-0 left-1/2 w-8 h-1/2 -translate-x-1/2 origin-bottom pt-3 text-center" style={{ transform: `rotate(${i * SEGMENT_ANGLE + (SEGMENT_ANGLE / 2)}deg)` }}>
-                                <span className="text-[16px] font-black block rotate-180">{n}</span>
+            {/* RUEDA (CENTRADA ARRIBA) */}
+            <div className="flex-1 w-full flex flex-col items-center justify-start py-6 relative z-10 transition-all duration-500" style={{ opacity: isTableOpen ? 0.3 : 1, transform: isTableOpen ? 'scale(0.9) translateY(-20px)' : 'scale(1) translateY(0)' }}>
+                <div className="relative w-72 h-72 md:w-80 md:h-80">
+                    <div className="w-full h-full rounded-full border-[6px] border-zinc-800 shadow-[0_0_40px_rgba(0,0,0,0.8)] relative overflow-hidden"
+                        style={{ transform: `rotate(-${wheelRotation}deg)`, transition: spinning ? `transform ${SPIN_DURATION}ms cubic-bezier(0.25, 0.1, 0.25, 1)` : 'none' }}>
+                        <div className="absolute inset-0" style={{ background: `conic-gradient(${WHEEL_NUMBERS.map((n, i) => { const color = n === 0 ? '#15803d' : [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(n) ? '#b91c1c' : '#18181b'; return `${color} ${i * SEGMENT_ANGLE}deg ${(i + 1) * SEGMENT_ANGLE}deg`; }).join(', ')})` }}></div>
+                        {WHEEL_NUMBERS.map((num, i) => (
+                            <div key={i} className="absolute top-0 left-1/2 -ml-[1px] w-[2px] h-[50%] flex flex-col items-center pt-2 origin-bottom" style={{ transform: `rotate(${i * SEGMENT_ANGLE + (SEGMENT_ANGLE / 2)}deg)` }}>
+                                <span className="text-[9px] font-black text-white drop-shadow-md transform rotate-180 w-6 text-center">{num}</span>
                             </div>
                         ))}
-                        <div className="absolute inset-0 m-auto w-[38%] h-[38%] bg-zinc-900 rounded-full border-[6px] border-zinc-700 flex items-center justify-center z-20">
-                            {lastResult !== null && !spinning && <div className={`w-20 h-20 rounded-full flex items-center justify-center border-4 ${getNumberColor(lastResult) === 'red' ? 'bg-red-600 border-red-400' : 'bg-zinc-900 border-zinc-700'} animate-in zoom-in`}><span className="text-4xl font-black">{lastResult}</span></div>}
+                        <div className="absolute inset-20 rounded-full border-[6px] border-zinc-800 bg-black flex items-center justify-center z-10 shadow-2xl">
+                            <div className="w-2 h-2 bg-yellow-600/50 rounded-full animate-pulse"></div>
                         </div>
                     </div>
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-white rounded-full shadow-[0_0_20px_white] z-30 border-2 border-zinc-300"></div>
+                    <div className="absolute inset-0 z-20 pointer-events-none" style={{ transform: `rotate(-${ballRotation}deg)`, transition: spinning ? `transform ${SPIN_DURATION}ms cubic-bezier(0.1, 0, 0.1, 1)` : 'none' }}>
+                        <div className="absolute top-0 left-1/2 -ml-1 w-2.5 h-2.5 bg-white rounded-full shadow-[0_0_8px_white]" style={{ marginTop: `${(100 - ballDistance) / 2}%`, transition: spinning ? `margin-top 1s ease-in-out ${SPIN_DURATION - 1000}ms` : 'none' }}></div>
+                    </div>
                 </div>
             </div>
 
-            {/* TABLERO */}
-            <div className={`absolute bottom-0 left-0 w-full transition-all duration-500 z-50 ${showBoard ? 'translate-y-0' : 'translate-y-[calc(100%-60px)]'}`}>
-                <button onClick={() => !spinning && setShowBoard(!showBoard)} className="w-full h-[60px] bg-[#062415] border-t-4 border-[#3e2b1f] flex items-center justify-between px-6 shadow-2xl">
-                    <div className="flex items-center gap-2">{showBoard ? <ChevronDown size={24} className="text-yellow-500" /> : <ChevronUp size={24} className="text-yellow-500" />}<span className="font-black text-sm uppercase tracking-widest text-gray-300">Tablero</span></div>
-                    <div className="text-yellow-500 font-black text-lg">{totalBet} 💰</div>
-                </button>
-                <div className="bg-[#062415] p-2 pb-10 border-t border-white/5">
-                    <div className="flex justify-center gap-2 mb-4">
-                        {CHIPS.map(val => (
-                            <button key={val} onClick={() => setSelectedChip(val)} className={`w-11 h-11 rounded-full border-2 border-dashed flex items-center justify-center font-black text-[10px] transition-all ${selectedChip === val ? 'scale-110 border-yellow-400 bg-yellow-500 text-black -translate-y-2' : 'opacity-60 bg-zinc-800 border-zinc-600'}`}>{val}</button>
+            {/* --- PANEL DESLIZANTE (BOTTOM SHEET) --- */}
+            <div
+                className={`fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-[2rem] border-t border-white/10 shadow-[0_-10px_60px_rgba(0,0,0,0.9)] z-30 flex flex-col transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)`}
+                style={{ height: isTableOpen ? '65%' : '140px' }}
+            >
+                {/* 1. BARRA CONTROL (Siempre visible) */}
+                <div className="px-3 pt-3 pb-2 flex items-center justify-between gap-2 border-b border-white/5 bg-zinc-900 rounded-t-[2rem]">
+                    <button onClick={() => setPaintMode(!paintMode)} disabled={spinning} className={`p-2 rounded-xl border transition-all ${paintMode ? 'bg-yellow-500 border-yellow-400 text-black' : 'bg-zinc-800 border-zinc-600 text-zinc-400'}`}>
+                        <Paintbrush size={18} />
+                    </button>
+                    <div className="flex-1 flex items-center justify-center gap-2 overflow-x-auto no-scrollbar">
+                        {CHIP_VALUES.map((val) => (
+                            <button key={val} onClick={() => setSelectedChip(val)} disabled={spinning || visualBalance < val} className={`w-8 h-8 rounded-full border shadow-md flex items-center justify-center font-bold text-[8px] shrink-0 transition-all ${getChipColorStyle(val)} ${selectedChip === val ? 'scale-110 ring-2 ring-white z-10' : 'opacity-70'} ${visualBalance < val ? 'opacity-20 grayscale' : ''}`}>{val}</button>
                         ))}
                     </div>
-                    {/* ... (Resto del tablero igual, omitido para ahorrar espacio ya que solo se cambiaron las funciones) */}
-                    <div className="max-w-xl mx-auto relative bg-green-950/40 rounded-xl p-2 border-2 border-[#a07820]/30 shadow-inner">
-                        <div className="grid grid-cols-[45px_repeat(12,1fr)_40px] gap-1 h-36 relative">
-                            {/* CERO */}
-                            <div className="relative">
-                                <button onClick={() => placeBet(0)} className="w-full h-full bg-green-700 rounded-l-lg font-black text-sm border border-white/10">0{bets[0] && <ChipVisual amount={bets[0]} />}</button>
-                                {/* ... Calles ... */}
+                    <button onClick={() => setIsTableOpen(!isTableOpen)} disabled={spinning} className="p-2 text-zinc-400 hover:text-white">
+                        {isTableOpen ? <ChevronDown size={24} /> : <ChevronUp size={24} className="animate-bounce" />}
+                    </button>
+                </div>
+
+                {/* 2. MESA (Visible solo abierta) */}
+                <div className={`flex-1 overflow-hidden relative flex items-center justify-center bg-zinc-950/50 transition-opacity duration-300 ${isTableOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                    <div className="transform scale-[0.65] origin-center w-full flex flex-col items-center">
+                        {/* TABLERO */}
+                        <div className="grid grid-cols-[50px_1fr_40px] gap-1 select-none min-w-[600px]">
+                            <button onMouseDown={() => !paintMode && placeBet('number', 0, [0], 36)} onPointerDown={() => paintMode && handleInteractionStart(0)} onMouseEnter={(e) => paintMode && isPointerDown && handleInteractionMove(e)} data-number="0" className="rounded-l-lg border border-green-700 bg-green-900/60 flex items-center justify-center text-white font-black text-xl hover:bg-green-800 relative touch-none" style={{ gridRow: '1 / span 3' }}>
+                                <span className="-rotate-90">0</span>
+                                {renderBoardChip(b => b.value === 0)}
+                            </button>
+                            <div className="grid grid-cols-12 grid-rows-3 gap-[1px]">
+                                {TABLE_ROWS.map((row) => row.map((num) => (
+                                    <button key={num} onMouseDown={() => !paintMode && handleNumberClick(num)} onPointerDown={() => paintMode && handleInteractionStart(num)} onMouseEnter={(e) => paintMode && isPointerDown && handleInteractionMove(e)} data-number={num} className={`h-12 border flex items-center justify-center text-white font-bold text-lg relative ${getNumColor(num)} hover:brightness-125 touch-none`}>
+                                        {num}
+                                        {renderBoardChip(b => b.type === 'number' && b.value === num)}
+                                    </button>
+                                )))}
                             </div>
-                            {/* NUMEROS */}
-                            <div className="col-span-12 grid grid-cols-12 grid-rows-3 gap-1 relative">
-                                {[3, 2, 1].map((row) => [...Array(12)].map((_, colIndex) => {
-                                    const n = (colIndex * 3) + row;
-                                    return (
-                                        <div key={n} className="relative h-11">
-                                            <button onClick={() => placeBet(n)} className={`w-full h-full rounded border border-white/5 font-black text-sm ${getNumberColor(n) === 'red' ? 'bg-red-700' : 'bg-zinc-900'}`}>{n}{bets[n] && <ChipVisual amount={bets[n]} />}</button>
-                                        </div>
-                                    )
-                                }))}
-                            </div>
-                            {/* COLUMNAS */}
-                            <div className="flex flex-col gap-1">
-                                <button onClick={() => placeBet('col3')} className="flex-1 bg-green-900/40 rounded text-[10px] border border-white/5">2:1</button>
-                                <button onClick={() => placeBet('col2')} className="flex-1 bg-green-900/40 rounded text-[10px] border border-white/5">2:1</button>
-                                <button onClick={() => placeBet('col1')} className="flex-1 bg-green-900/40 rounded text-[10px] border border-white/5">2:1</button>
+                            <div className="grid grid-rows-3 gap-[1px]">
+                                {[3, 2, 1].map((colNum, i) => (
+                                    <button key={i} onClick={() => placeBet('column', colNum, TABLE_ROWS[i], 3)} className="border border-zinc-600 bg-zinc-800/50 text-[10px] text-zinc-300 font-bold hover:bg-zinc-700 flex items-center justify-center relative rounded-r-lg">
+                                        <span className="-rotate-90">2:1</span>
+                                        {renderBoardChip(b => b.type === 'column' && b.value === colNum)}
+                                    </button>
+                                ))}
                             </div>
                         </div>
                         {/* EXTERNAS */}
-                        <div className="grid grid-cols-[45px_repeat(3,1fr)_40px] gap-1 mt-2 ml-11">
-                            <button onClick={() => placeBet('1st12')} className="h-9 bg-green-900/40 rounded border border-white/10 text-[10px] font-bold">1st 12</button>
-                            <button onClick={() => placeBet('2nd12')} className="h-9 bg-green-900/40 rounded border border-white/10 text-[10px] font-bold">2nd 12</button>
-                            <button onClick={() => placeBet('3rd12')} className="h-9 bg-green-900/40 rounded border border-white/10 text-[10px] font-bold">3rd 12</button>
+                        <div className="mt-1 grid grid-cols-[50px_1fr_40px] gap-1 min-w-[600px]">
+                            <div></div>
+                            <div className="grid grid-rows-2 gap-1">
+                                <div className="grid grid-cols-3 gap-1">
+                                    {[1, 2, 3].map((d) => (
+                                        <button key={d} onClick={() => placeBet('dozen', d, Array.from({ length: 12 }, (_, i) => i + 1 + (d - 1) * 12), 3)} className="h-10 bg-zinc-800 border border-zinc-600 rounded text-xs font-bold text-white hover:bg-zinc-700 relative">{d === 1 ? '1st 12' : d === 2 ? '2nd 12' : '3rd 12'} {renderBoardChip(b => b.type === 'dozen' && b.value === d)}</button>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-6 gap-1">
+                                    <button onClick={() => placeBet('low', 'low', Array.from({ length: 18 }, (_, i) => i + 1), 2)} className="h-10 bg-zinc-800 border border-zinc-600 rounded text-[10px] font-bold text-white relative">1-18 {renderBoardChip(b => b.type === 'low')}</button>
+                                    <button onClick={() => placeBet('even', 'even', WHEEL_NUMBERS.filter(n => n !== 0 && n % 2 === 0), 2)} className="h-10 bg-zinc-800 border border-zinc-600 rounded text-[10px] font-bold text-white relative">PAR {renderBoardChip(b => b.type === 'even')}</button>
+                                    <button onClick={() => placeBet('color', 'red', [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36], 2)} className="h-10 bg-red-700 border border-red-500 rounded text-[10px] font-bold text-white relative">ROJO {renderBoardChip(b => b.type === 'color' && b.value === 'red')}</button>
+                                    <button onClick={() => placeBet('color', 'black', [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35], 2)} className="h-10 bg-black border border-zinc-600 rounded text-[10px] font-bold text-white relative">NEGRO {renderBoardChip(b => b.type === 'color' && b.value === 'black')}</button>
+                                    <button onClick={() => placeBet('odd', 'odd', WHEEL_NUMBERS.filter(n => n !== 0 && n % 2 !== 0), 2)} className="h-10 bg-zinc-800 border border-zinc-600 rounded text-[10px] font-bold text-white relative">IMPAR {renderBoardChip(b => b.type === 'odd')}</button>
+                                    <button onClick={() => placeBet('high', 'high', Array.from({ length: 18 }, (_, i) => i + 19), 2)} className="h-10 bg-zinc-800 border border-zinc-600 rounded text-[10px] font-bold text-white relative">19-36 {renderBoardChip(b => b.type === 'high')}</button>
+                                </div>
+                            </div>
+                            <div></div>
                         </div>
-                        <div className="grid grid-cols-[45px_repeat(6,1fr)_40px] gap-1 mt-1 ml-11 text-[9px] font-bold">
-                            <button onClick={() => placeBet('1-18')} className="h-9 bg-green-950/60 rounded border border-white/5">1-18</button>
-                            <button onClick={() => placeBet('even')} className="h-9 bg-green-950/60 rounded border border-white/5">PAR</button>
-                            <button onClick={() => placeBet('red')} className="h-9 bg-red-700 rounded border border-white/5">ROJO</button>
-                            <button onClick={() => placeBet('black')} className="h-9 bg-zinc-900 rounded border border-white/5">NEGRO</button>
-                            <button onClick={() => placeBet('odd')} className="h-9 bg-green-950/60 rounded border border-white/5">IMPAR</button>
-                            <button onClick={() => placeBet('19-36')} className="h-9 bg-green-950/60 rounded border border-white/5">19-36</button>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 mt-4 max-w-xl mx-auto h-14">
-                        <button onClick={clearBets} disabled={spinning} className="h-full px-6 bg-zinc-800 rounded-2xl text-zinc-400 border border-white/5 active:scale-95 transition-all"><RotateCcw size={22} /></button>
-                        <button onClick={spinWheel} disabled={spinning || totalBet === 0} className={`flex-1 h-full rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all ${spinning || totalBet === 0 ? 'bg-zinc-800 text-zinc-600' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-black active:scale-[0.98] shadow-lg shadow-yellow-500/10'}`}>
-                            {spinning ? 'GIRANDO...' : `JUGAR`}
-                        </button>
                     </div>
                 </div>
+
+                {/* 3. FOOTER (Botones siempre visibles) */}
+                <div className="px-4 pb-6 pt-2 flex gap-3 items-center border-t border-white/5 bg-zinc-900 mt-auto">
+                    <div className="flex gap-1">
+                        <button onClick={undoLastBet} disabled={spinning || bets.length === 0} className="p-3 bg-zinc-800 rounded-xl border border-zinc-600 text-zinc-400 disabled:opacity-30"><Undo2 size={20} /></button>
+                        <button onClick={clearBets} disabled={spinning || bets.length === 0} className="p-3 bg-zinc-800 rounded-xl border border-zinc-600 text-red-400 disabled:opacity-30"><Trash2 size={20} /></button>
+                    </div>
+
+                    <button
+                        onClick={() => {
+                            if (bets.length === 0 && !isTableOpen) setIsTableOpen(true);
+                            else spin();
+                        }}
+                        disabled={spinning}
+                        className={`flex-1 font-black py-4 rounded-xl text-xl uppercase tracking-widest shadow-xl border-b-4 active:scale-95 disabled:grayscale disabled:opacity-50 transition-all flex items-center justify-center gap-2 ${bets.length === 0 && !isTableOpen ? 'bg-zinc-700 text-white border-zinc-900' : 'bg-gradient-to-r from-yellow-500 to-yellow-700 text-black border-yellow-900'}`}
+                    >
+                        {spinning ? 'GIRANDO...' : (bets.length === 0 && !isTableOpen) ? 'APOSTAR' : 'GIRAR'}
+                        {bets.length > 0 && <span className="text-sm font-bold bg-black/20 px-2 py-0.5 rounded text-yellow-900">{currentBetTotal}</span>}
+                    </button>
+                </div>
             </div>
+
+            {/* MODAL RESULTADO */}
+            {resultModal && (
+                <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in zoom-in-95 duration-200" onClick={() => setResultModal(null)}>
+                    <div className={`w-full max-w-xs rounded-[32px] p-8 text-center border-2 shadow-2xl relative ${resultModal.won ? 'bg-green-900/40 border-green-500' : 'bg-red-900/40 border-red-500'}`} onClick={e => e.stopPropagation()}>
+                        <div className="mb-4 flex justify-center">
+                            <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl font-black text-white shadow-xl border-4 ${resultModal.color === 'red' ? 'bg-red-600 border-red-400' : resultModal.color === 'black' ? 'bg-black border-zinc-500' : 'bg-green-600 border-green-400'}`}>
+                                {resultModal.num}
+                            </div>
+                        </div>
+                        <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-2">{resultModal.won ? '¡VICTORIA!' : 'SUERTE LA PRÓXIMA'}</h2>
+                        {resultModal.won && (
+                            <div className="flex items-center justify-center gap-2 mb-6 bg-black/40 py-2 rounded-xl">
+                                <span className="text-3xl font-black text-green-400">+{resultModal.payout}</span>
+                                <img src="/assets/icons/ficha.png" className="w-8 h-8" alt="f" />
+                            </div>
+                        )}
+                        <button onClick={() => setResultModal(null)} className="w-full py-4 bg-white text-black font-black rounded-2xl uppercase tracking-widest shadow-lg active:scale-95 transition-transform hover:bg-zinc-200">CONTINUAR</button>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL INFO */}
+            {showInfo && (
+                <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-6 animate-in fade-in">
+                    <div className="bg-zinc-900 w-full max-w-xs rounded-3xl border border-white/10 p-6 relative shadow-2xl">
+                        <button onClick={() => setShowInfo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X /></button>
+                        <h3 className="text-xl font-black text-white text-center mb-6 uppercase italic">Pagos</h3>
+                        <div className="space-y-2 text-xs text-zinc-300">
+                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Pleno (1 Núm)</span><span className="text-yellow-400 font-bold">x36</span></div>
+                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Columna / Docena</span><span className="text-yellow-400 font-bold">x3</span></div>
+                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Color / Par / Impar</span><span className="text-yellow-400 font-bold">x2</span></div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

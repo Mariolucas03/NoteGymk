@@ -44,14 +44,14 @@ const workoutLogSchema = mongoose.Schema({
     timestamps: true
 });
 
-// 🔥 ÍNDICES PARA RENDIMIENTO 🔥
-
-// 1. Índice compuesto: Busca logs de un usuario específico ordenados por fecha descendente
-// (Acelera la carga del historial general)
+// 🔥 OPTIMIZACIÓN KAIROS: Índices para consultas ultra-rápidas
+// 1. Índice principal para el historial cronológico y widgets semanales
 workoutLogSchema.index({ user: 1, date: -1 });
 
-// 2. Índice para gráficas específicas: Busca por usuario y filtra por nombre de ejercicio dentro del array
-// (Acelera el ProfileStats al buscar "Press Banca", por ejemplo)
-workoutLogSchema.index({ user: 1, "exercises.name": 1 });
+// 2. Índice compuesto para filtrar por tipo (gym/sport) rápidamente
+workoutLogSchema.index({ user: 1, type: 1, date: -1 });
+
+// 3. Índice para gráficas de ejercicios específicos (ProfileStats)
+workoutLogSchema.index({ user: 1, "exercises.name": 1, date: 1 });
 
 module.exports = mongoose.model('WorkoutLog', workoutLogSchema);
